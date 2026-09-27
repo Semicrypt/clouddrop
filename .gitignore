@@ -1,0 +1,32 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Tests
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+
+# Certificates
+*.pem
+*.key
+
+# Logs
+*.log
+logs/

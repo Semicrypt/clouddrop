@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: clouddrop-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - clouddrop_postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - clouddrop-network
+
+
+  backend:
+    build:
+      context: ./backend
+
+    container_name: clouddrop-api
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_PROFILE: default
+
+      AWS_AUTH_MODE: login
+      AWS_LOGIN_CACHE_DIRECTORY: /root/.aws/login/cache
+
+    volumes:
+      - ${HOME}/.aws/config:/root/.aws/config:ro
+      - ${HOME}/.aws/login/cache:/root/.aws/login/cache
+
+    ports:
+      - "5000:5000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:5000/health"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - clouddrop-network
+
+
+volumes:
+  clouddrop_postgres_data:
+
+
+networks:
+  clouddrop-network:
+    driver: bridge
