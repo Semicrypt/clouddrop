@@ -1,0 +1,244 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 4, 8, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.upload-modal {
+  width: min(100%, 530px);
+  padding: 25px;
+  border: 1px solid
+    rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: #0d1118;
+  box-shadow:
+    0 40px 100px
+    rgba(0, 0, 0, 0.55);
+}
+
+.upload-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content:
+    space-between;
+  gap: 20px;
+}
+
+.upload-modal-header h2 {
+  margin: 5px 0 5px;
+  font-family:
+    "Manrope", sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.upload-modal-header p {
+  margin: 0;
+  color: #929cab;
+  font-size: 13px;
+}
+
+.modal-close {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #929cab;
+  background:
+    rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  color: white;
+}
+
+.upload-dropzone {
+  min-height: 190px;
+  margin-top: 23px;
+  border: 1px dashed
+    rgba(139, 125, 255, 0.38);
+  border-radius: 16px;
+  background:
+    rgba(109, 93, 252, 0.035);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.active {
+  border-color:
+    rgba(139, 125, 255, 0.8);
+  background:
+    rgba(109, 93, 252, 0.08);
+}
+
+.upload-dropzone.active {
+  transform: scale(1.01);
+}
+
+.upload-modal-icon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 13px;
+  border-radius: 14px;
+  color: #9d92ff;
+  background:
+    rgba(109, 93, 252, 0.12);
+}
+
+.upload-dropzone strong {
+  font-size: 14px;
+}
+
+.upload-dropzone span {
+  margin-top: 5px;
+  color: #929cab;
+  font-size: 12px;
+}
+
+.upload-dropzone small {
+  margin-top: 16px;
+  color: #626d7d;
+  font-size: 11px;
+}
+
+.selected-file {
+  min-height: 64px;
+  margin-top: 13px;
+  padding: 0 13px;
+  display: grid;
+  grid-template-columns:
+    40px 1fr 32px;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid
+    rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background:
+    rgba(255, 255, 255, 0.02);
+}
+
+.selected-file-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #9d92ff;
+  background:
+    rgba(109, 93, 252, 0.1);
+}
+
+.selected-file > div:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.selected-file strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.selected-file span {
+  color: #929cab;
+  font-size: 11px;
+}
+
+.selected-file button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  color: #929cab;
+  cursor: pointer;
+}
+
+.upload-description {
+  display: block;
+  margin-top: 19px;
+  color: #b6bdc8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.upload-description > span {
+  margin-left: 5px;
+  color: #626d7d;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.upload-description textarea {
+  width: 100%;
+  margin-top: 9px;
+  padding: 12px 13px;
+  resize: vertical;
+  border: 1px solid
+    rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  outline: none;
+  color: white;
+  background:
+    rgba(255, 255, 255, 0.025);
+}
+
+.upload-description textarea:focus {
+  border-color:
+    rgba(139, 125, 255, 0.55);
+}
+
+.upload-error {
+  margin:
+    14px 0 0;
+}
+
+.upload-modal-actions {
+  margin-top: 22px;
+  display: flex;
+  justify-content:
+    flex-end;
+  gap: 10px;
+}
+
+@media (
+  max-width: 600px
+) {
+  .modal-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .upload-modal {
+    border-radius:
+      22px 22px 0 0;
+    padding:
+      23px 18px 28px;
+  }
+
+  .upload-modal-actions {
+    display: grid;
+    grid-template-columns:
+      1fr 1fr;
+  }
+}
