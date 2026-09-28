@@ -11,8 +11,6 @@ import {
   getSignedUrl,
 } from "@aws-sdk/s3-request-presigner";
 
-import s3 from "../config/s3.js";
-
 import {
   findFileByIdForUser,
 } from "../repositories/file.repository.js";
@@ -24,15 +22,26 @@ import {
   findSharesForFile,
 } from "../repositories/share.repository.js";
 
-function hashToken(token) {
-  return createHash("sha256")
+import {
+  getFileStorage,
+} from "./storage.service.js";
+
+function hashToken(
+  token
+) {
+  return createHash(
+    "sha256"
+  )
     .update(token)
     .digest("hex");
 }
 
 function createSecureToken() {
-  return randomBytes(32)
-    .toString("base64url");
+  return randomBytes(
+    32
+  ).toString(
+    "base64url"
+  );
 }
 
 export async function createTemporaryShare({
@@ -48,7 +57,9 @@ export async function createTemporaryShare({
 
   if (!file) {
     const error =
-      new Error("File not found");
+      new Error(
+        "File not found"
+      );
 
     error.status = 404;
 
@@ -72,36 +83,46 @@ export async function createTemporaryShare({
   const requestedExpiry =
     Number(
       expiresInMinutes ||
-      defaultExpiry
+        defaultExpiry
     );
 
   if (
-    !Number.isFinite(requestedExpiry) ||
+    !Number.isFinite(
+      requestedExpiry
+    ) ||
     requestedExpiry <= 0
   ) {
-    const error = new Error(
-      "Expiry must be a positive number of minutes"
-    );
+    const error =
+      new Error(
+        "Expiry must be a positive number of minutes"
+      );
 
     error.status = 400;
 
     throw error;
   }
 
-  if (requestedExpiry > maxExpiry) {
-    const error = new Error(
-      `Share links cannot exceed ${maxExpiry} minutes`
-    );
+  if (
+    requestedExpiry >
+    maxExpiry
+  ) {
+    const error =
+      new Error(
+        `Share links cannot exceed ${maxExpiry} minutes`
+      );
 
     error.status = 400;
 
     throw error;
   }
 
-  const token = createSecureToken();
+  const token =
+    createSecureToken();
 
   const tokenHash =
-    hashToken(token);
+    hashToken(
+      token
+    );
 
   const expiresAt =
     new Date(
@@ -121,6 +142,7 @@ export async function createTemporaryShare({
   return {
     share,
     token,
+
     expiresInMinutes:
       requestedExpiry,
   };
@@ -131,7 +153,9 @@ export async function resolveShareToken(
 ) {
   if (!token) {
     const error =
-      new Error("Share token is required");
+      new Error(
+        "Share token is required"
+      );
 
     error.status = 400;
 
@@ -139,7 +163,9 @@ export async function resolveShareToken(
   }
 
   const tokenHash =
-    hashToken(token);
+    hashToken(
+      token
+    );
 
   const share =
     await findShareByTokenHash(
@@ -158,10 +184,13 @@ export async function resolveShareToken(
   }
 
   const expiresAt =
-    new Date(share.expires_at);
+    new Date(
+      share.expires_at
+    );
 
   if (
-    expiresAt.getTime() <= Date.now()
+    expiresAt.getTime() <=
+    Date.now()
   ) {
     const error =
       new Error(
@@ -172,6 +201,11 @@ export async function resolveShareToken(
 
     throw error;
   }
+
+  const storage =
+    await getFileStorage(
+      share
+    );
 
   const command =
     new GetObjectCommand({
@@ -189,19 +223,18 @@ export async function resolveShareToken(
 
   const downloadUrl =
     await getSignedUrl(
-      s3,
+      storage.client,
       command,
       {
-        // S3 URL only lives 5 minutes.
-        // The CloudDrop share token
-        // can live much longer.
-        expiresIn: 300,
+        expiresIn:
+          300,
       }
     );
 
   return {
     file: {
-      id: share.file_id,
+      id:
+        share.file_id,
 
       originalName:
         share.original_name,
@@ -217,6 +250,9 @@ export async function resolveShareToken(
 
       description:
         share.description,
+
+      storageMode:
+        share.storage_mode,
     },
 
     expiresAt:
@@ -241,7 +277,9 @@ export async function listFileShares({
 
   if (!file) {
     const error =
-      new Error("File not found");
+      new Error(
+        "File not found"
+      );
 
     error.status = 404;
 
