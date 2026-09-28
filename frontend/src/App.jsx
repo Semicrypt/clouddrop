@@ -7,10 +7,12 @@ import {
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
+import AwsStorage from "./pages/AwsStorage";
 import Dashboard from "./pages/Dashboard";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Shared from "./pages/Shared";
 
 export default function App() {
   return (
@@ -18,17 +20,23 @@ export default function App() {
       <Routes>
         <Route
           path="/"
-          element={<Landing />}
+          element={
+            <Landing />
+          }
         />
 
         <Route
           path="/login"
-          element={<Login />}
+          element={
+            <Login />
+          }
         />
 
         <Route
           path="/register"
-          element={<Register />}
+          element={
+            <Register />
+          }
         />
 
         <Route
@@ -36,6 +44,24 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/shared"
+          element={
+            <ProtectedRoute>
+              <Shared />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/aws-storage"
+          element={
+            <ProtectedRoute>
+              <AwsStorage />
             </ProtectedRoute>
           }
         />

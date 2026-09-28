@@ -10,10 +10,13 @@ import App from "./App.jsx";
 
 import "./index.css";
 
-createRoot(
+const root =
   document.getElementById(
     "root"
-  )
+  );
+
+createRoot(
+  root
 ).render(
   <StrictMode>
     <App />

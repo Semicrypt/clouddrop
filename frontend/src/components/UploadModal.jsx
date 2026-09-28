@@ -1,6 +1,8 @@
 import {
   File,
+  Info,
   Loader2,
+  ShieldCheck,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -44,12 +46,33 @@ const ACCEPTED_FILES = [
   ".pptx",
 ].join(",");
 
+function formatSize(bytes) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (
+    bytes <
+    1024 * 1024
+  ) {
+    return `${(
+      bytes / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  return `${(
+    bytes /
+    (1024 * 1024)
+  ).toFixed(1)} MB`;
+}
+
 export default function UploadModal({
   open,
   onClose,
   onUploaded,
 }) {
-  const inputRef = useRef(null);
+  const inputRef =
+    useRef(null);
 
   const [
     file,
@@ -132,6 +155,20 @@ export default function UploadModal({
     );
   }
 
+  function clearSelectedFile() {
+    if (loading) {
+      return;
+    }
+
+    setFile(null);
+    setError("");
+
+    if (inputRef.current) {
+      inputRef.current.value =
+        "";
+    }
+  }
+
   function resetAndClose() {
     if (loading) {
       return;
@@ -191,12 +228,15 @@ export default function UploadModal({
           "";
       }
 
-      await onUploaded();
+      if (onUploaded) {
+        await onUploaded();
+      }
 
       onClose();
     } catch (requestError) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
           "Unable to upload file."
       );
@@ -205,37 +245,18 @@ export default function UploadModal({
     }
   }
 
-  function formatSize(
-    bytes
-  ) {
-    if (bytes < 1024) {
-      return `${bytes} B`;
-    }
-
-    if (
-      bytes <
-      1024 * 1024
-    ) {
-      return `${(
-        bytes / 1024
-      ).toFixed(1)} KB`;
-    }
-
-    return `${(
-      bytes /
-      (1024 * 1024)
-    ).toFixed(1)} MB`;
-  }
-
   return (
     <div
-      className="modal-backdrop"
+      className="upload-modal-backdrop"
       onMouseDown={
         resetAndClose
       }
     >
       <section
-        className="upload-modal"
+        className="upload-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upload-modal-title"
         onMouseDown={(
           event
         ) =>
@@ -243,24 +264,34 @@ export default function UploadModal({
         }
       >
         <header className="upload-modal-header">
-          <div>
-            <span className="muted-label">
-              CloudDrop storage
-            </span>
+          <div className="upload-modal-heading-wrap">
+            <div className="upload-modal-heading-icon">
+              <UploadCloud
+                size={20}
+              />
+            </div>
 
-            <h2>
-              Upload file
-            </h2>
+            <div>
+              <span className="upload-modal-kicker">
+                CloudDrop storage
+              </span>
 
-            <p>
-              Files are stored
-              securely in your
-              private S3 storage.
-            </p>
+              <h2
+                id="upload-modal-title"
+              >
+                Upload file
+              </h2>
+
+              <p>
+                Add a file to your
+                secure CloudDrop
+                workspace.
+              </p>
+            </div>
           </div>
 
           <button
-            className="modal-close"
+            className="upload-modal-close"
             type="button"
             onClick={
               resetAndClose
@@ -268,37 +299,86 @@ export default function UploadModal({
             disabled={loading}
             aria-label="Close upload window"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </header>
 
+        <div className="upload-storage-note">
+          <div className="upload-storage-note-icon">
+            <ShieldCheck
+              size={17}
+            />
+          </div>
+
+          <div>
+            <strong>
+              Secure storage routing
+            </strong>
+
+            <p>
+              CloudDrop automatically
+              sends the upload to your
+              active storage
+              destination.
+            </p>
+          </div>
+        </div>
+
         <div
-          className={
+          className={`upload-dropzone ${
             dragActive
-              ? "upload-dropzone active"
-              : "upload-dropzone"
-          }
+              ? "active"
+              : ""
+          } ${
+            file
+              ? "has-file"
+              : ""
+          }`}
           onDragEnter={(
             event
           ) => {
             event.preventDefault();
-            setDragActive(true);
+
+            if (!loading) {
+              setDragActive(
+                true
+              );
+            }
           }}
           onDragOver={(
             event
           ) => {
             event.preventDefault();
-            setDragActive(true);
+
+            if (!loading) {
+              setDragActive(
+                true
+              );
+            }
           }}
-          onDragLeave={() =>
-            setDragActive(false)
-          }
-          onDrop={
-            handleDrop
-          }
-          onClick={() =>
-            inputRef.current?.click()
-          }
+          onDragLeave={(
+            event
+          ) => {
+            event.preventDefault();
+
+            setDragActive(
+              false
+            );
+          }}
+          onDrop={(
+            event
+          ) => {
+            if (!loading) {
+              handleDrop(
+                event
+              );
+            }
+          }}
+          onClick={() => {
+            if (!loading) {
+              inputRef.current?.click();
+            }
+          }}
         >
           <input
             ref={inputRef}
@@ -307,6 +387,7 @@ export default function UploadModal({
             accept={
               ACCEPTED_FILES
             }
+            disabled={loading}
             onChange={(
               event
             ) =>
@@ -317,81 +398,126 @@ export default function UploadModal({
             }
           />
 
-          <div className="upload-modal-icon">
+          <div className="upload-dropzone-icon">
             <UploadCloud
-              size={26}
+              size={27}
             />
           </div>
 
           <strong>
-            Drag and drop a file
+            Drop your file here
           </strong>
 
-          <span>
-            or click to browse
-          </span>
+          <p>
+            or click anywhere in this
+            area to browse your device
+          </p>
 
-          <small>
-            JPG, PNG, WEBP,
-            PDF, TXT, CSV,
-            ZIP, DOCX, XLSX
-            and PPTX
-          </small>
+          <div className="upload-format-row">
+            <span>
+              JPG
+            </span>
+
+            <span>
+              PNG
+            </span>
+
+            <span>
+              WEBP
+            </span>
+
+            <span>
+              PDF
+            </span>
+
+            <span>
+              DOCX
+            </span>
+
+            <span>
+              XLSX
+            </span>
+
+            <span>
+              + more
+            </span>
+          </div>
 
           <small>
             Maximum file size:
-            10 MB
+            <strong>
+              {" "}
+              10 MB
+            </strong>
           </small>
         </div>
 
         {file && (
-          <div className="selected-file">
-            <div className="selected-file-icon">
-              <File size={19} />
+          <div className="upload-selected-file">
+            <div className="upload-selected-file-icon">
+              <File
+                size={19}
+              />
             </div>
 
-            <div>
-              <strong>
+            <div className="upload-selected-file-copy">
+              <span>
+                Selected file
+              </span>
+
+              <strong
+                title={
+                  file.name
+                }
+              >
                 {file.name}
               </strong>
 
-              <span>
+              <small>
                 {formatSize(
                   file.size
                 )}
-              </span>
+
+                {file.type
+                  ? ` • ${file.type}`
+                  : ""}
+              </small>
             </div>
 
             <button
               type="button"
-              onClick={() => {
-                setFile(null);
+              onClick={(
+                event
+              ) => {
+                event.stopPropagation();
 
-                if (
-                  inputRef.current
-                ) {
-                  inputRef.current.value =
-                    "";
-                }
+                clearSelectedFile();
               }}
               disabled={loading}
               aria-label="Remove selected file"
             >
-              <X size={17} />
+              <X size={16} />
             </button>
           </div>
         )}
 
         <label className="upload-description">
-          Description
+          <div className="upload-description-heading">
+            <span>
+              Description
+            </span>
 
-          <span>
-            optional
-          </span>
+            <small>
+              Optional
+            </small>
+          </div>
 
           <textarea
             rows="3"
-            value={description}
+            maxLength={500}
+            value={
+              description
+            }
             onChange={(
               event
             ) =>
@@ -400,21 +526,54 @@ export default function UploadModal({
                   .value
               )
             }
-            placeholder="Add a short description..."
+            placeholder="Add a short description for this file..."
             disabled={loading}
           />
+
+          <div className="upload-description-footer">
+            <span>
+              Useful for identifying
+              files later.
+            </span>
+
+            <span>
+              {
+                description.length
+              }
+              /500
+            </span>
+          </div>
         </label>
 
         {error && (
-          <div className="error-banner upload-error">
-            {error}
+          <div
+            className="upload-error-banner"
+            role="alert"
+          >
+            <Info
+              size={17}
+            />
+
+            <span>
+              {error}
+            </span>
+
+            <button
+              type="button"
+              aria-label="Dismiss error"
+              onClick={() =>
+                setError("")
+              }
+            >
+              <X size={15} />
+            </button>
           </div>
         )}
 
         <footer className="upload-modal-actions">
           <button
             type="button"
-            className="button button-secondary"
+            className="upload-secondary-button"
             onClick={
               resetAndClose
             }
@@ -425,7 +584,7 @@ export default function UploadModal({
 
           <button
             type="button"
-            className="button button-primary"
+            className="upload-primary-button"
             onClick={
               handleUpload
             }
@@ -437,11 +596,11 @@ export default function UploadModal({
             {loading ? (
               <>
                 <Loader2
-                  className="spinner"
+                  className="upload-spinner"
                   size={18}
                 />
 
-                Uploading...
+                Uploading…
               </>
             ) : (
               <>

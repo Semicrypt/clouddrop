@@ -1,16 +1,19 @@
 import {
+  useState,
+} from "react";
+
+import {
   ArrowLeft,
+  ArrowRight,
+  Check,
   Cloud,
   Eye,
   EyeOff,
-  Loader2,
-  LockKeyhole,
+  LoaderCircle,
+  Lock,
   Mail,
+  ShieldCheck,
 } from "lucide-react";
-
-import {
-  useState,
-} from "react";
 
 import {
   Link,
@@ -19,19 +22,19 @@ import {
 
 import api from "../api/client";
 
+import "./Login.css";
+
 export default function Login() {
   const navigate =
     useNavigate();
 
   const [
-    email,
-    setEmail,
-  ] = useState("");
-
-  const [
-    password,
-    setPassword,
-  ] = useState("");
+    form,
+    setForm,
+  ] = useState({
+    email: "",
+    password: "",
+  });
 
   const [
     showPassword,
@@ -48,38 +51,87 @@ export default function Login() {
     setError,
   ] = useState("");
 
+  function handleChange(
+    event
+  ) {
+    const {
+      name,
+      value,
+    } = event.target;
+
+    setForm(
+      (current) => ({
+        ...current,
+        [name]: value,
+      })
+    );
+
+    if (error) {
+      setError("");
+    }
+  }
+
   async function handleSubmit(
     event
   ) {
     event.preventDefault();
 
-    setError("");
+    if (
+      !form.email.trim() ||
+      !form.password
+    ) {
+      setError(
+        "Enter your email and password."
+      );
+
+      return;
+    }
+
     setLoading(true);
+    setError("");
 
     try {
       const response =
         await api.post(
           "/api/auth/login",
           {
-            email,
-            password,
+            email:
+              form.email
+                .trim()
+                .toLowerCase(),
+
+            password:
+              form.password,
           }
         );
 
-      const {
-        token,
-        user,
-      } = response.data.data;
+      const token =
+        response?.data?.data
+          ?.token;
+
+      const user =
+        response?.data?.data
+          ?.user;
+
+      if (!token) {
+        throw new Error(
+          "Login response did not include an authentication token."
+        );
+      }
 
       localStorage.setItem(
         "clouddrop_token",
         token
       );
 
-      localStorage.setItem(
-        "clouddrop_user",
-        JSON.stringify(user)
-      );
+      if (user) {
+        localStorage.setItem(
+          "clouddrop_user",
+          JSON.stringify(
+            user
+          )
+        );
+      }
 
       navigate(
         "/dashboard",
@@ -89,9 +141,10 @@ export default function Login() {
       );
     } catch (requestError) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
-          "Unable to sign in. Please try again."
+          "Unable to sign in. Check your email and password and try again."
       );
     } finally {
       setLoading(false);
@@ -99,199 +152,373 @@ export default function Login() {
   }
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel auth-brand-panel">
-        <Link
-          to="/"
-          className="brand"
-        >
-          <div className="brand-mark">
-            <Cloud size={21} />
-          </div>
+    <div className="login-page">
+      <div className="login-background-grid" />
 
+      <div className="login-glow login-glow-one" />
+      <div className="login-glow login-glow-two" />
+
+      <header className="login-header">
+        <Link
+          className="login-brand"
+          to="/"
+        >
           <span>
-            CloudDrop
+            <Cloud
+              size={20}
+            />
           </span>
+
+          <strong>
+            Cloud
+            <em>
+              Drop
+            </em>
+          </strong>
         </Link>
 
-        <div className="auth-brand-copy">
-          <span className="eyebrow">
-            <span className="eyebrow-dot" />
-
-            Secure workspace
-          </span>
-
-          <h1>
-            Your cloud files,
-            wherever you are.
-          </h1>
-
-          <p>
-            Sign in to access your
-            private files, downloads
-            and secure sharing tools.
-          </p>
-        </div>
-
-        <div className="auth-security-note">
-          <LockKeyhole
-            size={20}
+        <Link
+          className="login-back"
+          to="/"
+        >
+          <ArrowLeft
+            size={16}
           />
 
-          <div>
-            <strong>
-              Protected access
-            </strong>
+          Back to home
+        </Link>
+      </header>
 
-            <span>
-              JWT authentication and
-              private cloud storage.
-            </span>
-          </div>
-        </div>
-      </section>
+      <main className="login-main">
+        <section className="login-showcase">
+          <div className="login-showcase-content">
+            <div className="login-kicker">
+              <ShieldCheck
+                size={15}
+              />
 
-      <section className="auth-panel auth-form-panel">
-        <div className="auth-form-wrapper">
-          <Link
-            to="/"
-            className="back-link"
-          >
-            <ArrowLeft size={17} />
+              Secure cloud
+              workspace
+            </div>
 
-            Back to home
-          </Link>
-
-          <div className="auth-heading">
-            <h2>
-              Welcome back
-            </h2>
+            <h1>
+              Welcome back to
+              <span>
+                {" "}
+                CloudDrop.
+              </span>
+            </h1>
 
             <p>
-              Sign in to your
-              CloudDrop account.
+              Access your files,
+              storage configuration,
+              temporary shares and
+              connected AWS
+              infrastructure from one
+              secure workspace.
             </p>
+
+            <div className="login-benefits">
+              <div>
+                <span>
+                  <Check
+                    size={14}
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    Private file
+                    storage
+                  </strong>
+
+                  <small>
+                    Secure uploads and
+                    signed downloads.
+                  </small>
+                </div>
+              </div>
+
+              <div>
+                <span>
+                  <Check
+                    size={14}
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    AWS integration
+                  </strong>
+
+                  <small>
+                    Cross-account IAM
+                    with temporary STS
+                    credentials.
+                  </small>
+                </div>
+              </div>
+
+              <div>
+                <span>
+                  <Check
+                    size={14}
+                  />
+                </span>
+
+                <div>
+                  <strong>
+                    Multi-bucket
+                    control
+                  </strong>
+
+                  <small>
+                    Choose default
+                    storage, versioning
+                    and bucket actions.
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {error && (
-            <div className="error-banner">
-              {error}
+          <div className="login-security-visual">
+            <div className="login-security-ring ring-one" />
+            <div className="login-security-ring ring-two" />
+
+            <div className="login-security-core">
+              <ShieldCheck
+                size={35}
+              />
+
+              <strong>
+                Protected
+              </strong>
+
+              <span>
+                CloudDrop
+              </span>
             </div>
-          )}
 
-          <form
-            onSubmit={
-              handleSubmit
-            }
-            className="auth-form"
-          >
-            <label>
-              Email address
+            <div className="login-security-chip chip-left">
+              <Lock
+                size={15}
+              />
 
-              <div className="input-wrapper">
-                <Mail
-                  size={18}
+              Private storage
+            </div>
+
+            <div className="login-security-chip chip-right">
+              <Cloud
+                size={15}
+              />
+
+              AWS connected
+            </div>
+          </div>
+        </section>
+
+        <section className="login-form-section">
+          <div className="login-form-card">
+            <div className="login-form-heading">
+              <span>
+                Sign in
+              </span>
+
+              <h2>
+                Access your
+                workspace
+              </h2>
+
+              <p>
+                Enter your CloudDrop
+                account credentials.
+              </p>
+            </div>
+
+            {error && (
+              <div
+                className="login-error"
+                role="alert"
+              >
+                <ShieldCheck
+                  size={17}
                 />
 
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(
-                    event
-                  ) =>
-                    setEmail(
-                      event.target
-                        .value
-                    )
-                  }
-                  placeholder="you@example.com"
-                  required
-                  autoComplete="email"
-                />
+                <span>
+                  {error}
+                </span>
               </div>
-            </label>
+            )}
 
-            <label>
-              Password
-
-              <div className="input-wrapper">
-                <LockKeyhole
-                  size={18}
-                />
-
-                <input
-                  type={
-                    showPassword
-                      ? "text"
-                      : "password"
-                  }
-                  value={password}
-                  onChange={(
-                    event
-                  ) =>
-                    setPassword(
-                      event.target
-                        .value
-                    )
-                  }
-                  placeholder="Enter your password"
-                  required
-                  autoComplete="current-password"
-                />
-
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() =>
-                    setShowPassword(
-                      (current) =>
-                        !current
-                    )
-                  }
-                  aria-label="Toggle password visibility"
-                >
-                  {showPassword ? (
-                    <EyeOff
-                      size={18}
-                    />
-                  ) : (
-                    <Eye
-                      size={18}
-                    />
-                  )}
-                </button>
-              </div>
-            </label>
-
-            <button
-              className="button button-primary auth-submit"
-              disabled={loading}
-              type="submit"
+            <form
+              className="login-form"
+              onSubmit={
+                handleSubmit
+              }
             >
-              {loading ? (
-                <>
-                  <Loader2
-                    className="spinner"
-                    size={18}
+              <label>
+                <span>
+                  Email address
+                </span>
+
+                <div className="login-input-wrap">
+                  <Mail
+                    size={17}
                   />
 
-                  Signing in...
-                </>
-              ) : (
-                "Sign in"
-              )}
-            </button>
-          </form>
+                  <input
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={
+                      form.email
+                    }
+                    onChange={
+                      handleChange
+                    }
+                    disabled={
+                      loading
+                    }
+                    required
+                  />
+                </div>
+              </label>
 
-          <p className="auth-switch">
-            Don't have an account?
+              <label>
+                <span>
+                  Password
+                </span>
 
-            <Link to="/register">
-              Create one
+                <div className="login-input-wrap">
+                  <Lock
+                    size={17}
+                  />
+
+                  <input
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
+                    }
+                    name="password"
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    value={
+                      form.password
+                    }
+                    onChange={
+                      handleChange
+                    }
+                    disabled={
+                      loading
+                    }
+                    required
+                  />
+
+                  <button
+                    className="login-password-toggle"
+                    type="button"
+                    aria-label={
+                      showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                    onClick={() =>
+                      setShowPassword(
+                        (current) =>
+                          !current
+                      )
+                    }
+                    disabled={
+                      loading
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff
+                        size={17}
+                      />
+                    ) : (
+                      <Eye
+                        size={17}
+                      />
+                    )}
+                  </button>
+                </div>
+              </label>
+
+              <button
+                className="login-submit"
+                type="submit"
+                disabled={
+                  loading
+                }
+              >
+                {loading ? (
+                  <>
+                    <LoaderCircle
+                      size={18}
+                      className="login-spin"
+                    />
+
+                    Signing in…
+                  </>
+                ) : (
+                  <>
+                    Sign in
+
+                    <ArrowRight
+                      size={18}
+                    />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="login-divider">
+              <span>
+                New to CloudDrop?
+              </span>
+            </div>
+
+            <Link
+              className="login-create-account"
+              to="/register"
+            >
+              Create an account
+
+              <ArrowRight
+                size={17}
+              />
             </Link>
-          </p>
-        </div>
-      </section>
-    </main>
+
+            <div className="login-security-note">
+              <Lock
+                size={14}
+              />
+
+              <p>
+                CloudDrop never asks
+                you to enter AWS
+                access keys or secret
+                keys when connecting
+                your AWS account.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="login-footer">
+        <span>
+          © 2026 CloudDrop
+        </span>
+
+        <span>
+          Secure cloud file storage
+        </span>
+      </footer>
+    </div>
   );
 }

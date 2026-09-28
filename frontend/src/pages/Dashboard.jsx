@@ -1,13 +1,19 @@
 import {
   Cloud,
+  Database,
   File,
   FileText,
   Filter,
+  HardDrive,
   LogOut,
+  Menu,
   MoreHorizontal,
+  RefreshCw,
   Search,
   Share2,
+  ShieldCheck,
   UploadCloud,
+  X,
 } from "lucide-react";
 
 import {
@@ -26,6 +32,8 @@ import api from "../api/client";
 import FileDetailsModal from "../components/FileDetailsModal";
 import UploadModal from "../components/UploadModal";
 
+import "./Dashboard.css";
+
 const CATEGORIES = [
   "all",
   "documents",
@@ -36,6 +44,80 @@ const CATEGORIES = [
   "other",
 ];
 
+function formatSize(bytes) {
+  const value =
+    Number(bytes || 0);
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (
+    value <
+    1024 * 1024
+  ) {
+    return `${(
+      value / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  if (
+    value <
+    1024 *
+      1024 *
+      1024
+  ) {
+    return `${(
+      value /
+      (1024 * 1024)
+    ).toFixed(1)} MB`;
+  }
+
+  return `${(
+    value /
+    (1024 *
+      1024 *
+      1024)
+  ).toFixed(1)} GB`;
+}
+
+function formatStorageMode(
+  storageMode
+) {
+  const value =
+    String(
+      storageMode || ""
+    ).toLowerCase();
+
+  if (
+    value.includes(
+      "customer"
+    ) ||
+    value.includes(
+      "aws"
+    )
+  ) {
+    return "My AWS";
+  }
+
+  return "Managed";
+}
+
+function DashboardBrand() {
+  return (
+    <div className="dashboard-brand">
+      <span className="dashboard-brand-mark">
+        <Cloud size={19} />
+      </span>
+
+      <strong>
+        Cloud
+        <em>Drop</em>
+      </strong>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const navigate =
     useNavigate();
@@ -43,6 +125,16 @@ export default function Dashboard() {
   const [
     files,
     setFiles,
+  ] = useState([]);
+
+  const [
+    connection,
+    setConnection,
+  ] = useState(null);
+
+  const [
+    buckets,
+    setBuckets,
   ] = useState([]);
 
   const [
@@ -61,6 +153,11 @@ export default function Dashboard() {
   ] = useState(true);
 
   const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
     error,
     setError,
   ] = useState("");
@@ -74,6 +171,11 @@ export default function Dashboard() {
     selectedFile,
     setSelectedFile,
   ] = useState(null);
+
+  const [
+    mobileSidebarOpen,
+    setMobileSidebarOpen,
+  ] = useState(false);
 
   const user = useMemo(() => {
     try {
@@ -105,73 +207,170 @@ export default function Dashboard() {
       );
     }, [navigate]);
 
-  const refreshFiles =
-    useCallback(async () => {
-      try {
-        setError("");
-
-        const response =
-          await api.get(
-            "/api/files"
-          );
-
-        setFiles(
-          response.data.data
-            .files
-        );
-      } catch (
-        requestError
-      ) {
-        if (
-          requestError.response
-            ?.status === 401
-        ) {
-          logout();
-          return;
+  const loadWorkspace =
+    useCallback(
+      async ({
+        quiet = false,
+      } = {}) => {
+        if (!quiet) {
+          setError("");
         }
 
-        setError(
-          "Unable to load your files."
+        const results =
+          await Promise.allSettled([
+            api.get(
+              "/api/files"
+            ),
+
+            api.get(
+              "/api/aws/connection"
+            ),
+
+            api.get(
+              "/api/aws/buckets"
+            ),
+          ]);
+
+        const [
+          filesResult,
+          connectionResult,
+          bucketsResult,
+        ] = results;
+
+        if (
+          filesResult.status ===
+          "rejected"
+        ) {
+          if (
+            filesResult.reason
+              ?.response
+              ?.status === 401
+          ) {
+            logout();
+
+            return;
+          }
+
+          throw new Error(
+            "Unable to load your files."
+          );
+        }
+
+        setFiles(
+          filesResult.value
+            ?.data?.data
+            ?.files || []
         );
-      }
-    }, [logout]);
+
+        if (
+          connectionResult.status ===
+          "fulfilled"
+        ) {
+          setConnection(
+            connectionResult.value
+              ?.data?.data
+              ?.connection ||
+              null
+          );
+        }
+
+        if (
+          bucketsResult.status ===
+          "fulfilled"
+        ) {
+          setBuckets(
+            bucketsResult.value
+              ?.data?.data
+              ?.buckets || []
+          );
+        }
+      },
+      [logout]
+    );
 
   useEffect(() => {
     let active = true;
 
-    async function loadInitialFiles() {
+    async function loadInitialWorkspace() {
       try {
-        const response =
-          await api.get(
-            "/api/files"
-          );
+        const results =
+          await Promise.allSettled([
+            api.get(
+              "/api/files"
+            ),
+
+            api.get(
+              "/api/aws/connection"
+            ),
+
+            api.get(
+              "/api/aws/buckets"
+            ),
+          ]);
 
         if (!active) {
           return;
+        }
+
+        const [
+          filesResult,
+          connectionResult,
+          bucketsResult,
+        ] = results;
+
+        if (
+          filesResult.status ===
+          "rejected"
+        ) {
+          if (
+            filesResult.reason
+              ?.response
+              ?.status === 401
+          ) {
+            logout();
+
+            return;
+          }
+
+          throw new Error(
+            "Unable to load your files."
+          );
         }
 
         setFiles(
-          response.data.data
-            .files
+          filesResult.value
+            ?.data?.data
+            ?.files || []
         );
-      } catch (
-        requestError
-      ) {
-        if (!active) {
-          return;
+
+        if (
+          connectionResult.status ===
+          "fulfilled"
+        ) {
+          setConnection(
+            connectionResult.value
+              ?.data?.data
+              ?.connection ||
+              null
+          );
         }
 
         if (
-          requestError.response
-            ?.status === 401
+          bucketsResult.status ===
+          "fulfilled"
         ) {
-          logout();
-          return;
+          setBuckets(
+            bucketsResult.value
+              ?.data?.data
+              ?.buckets || []
+          );
         }
-
-        setError(
-          "Unable to load your files."
-        );
+      } catch {
+        if (active) {
+          setError(
+            "Unable to load your workspace."
+          );
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -179,441 +378,865 @@ export default function Dashboard() {
       }
     }
 
-    loadInitialFiles();
+    loadInitialWorkspace();
 
     return () => {
       active = false;
     };
   }, [logout]);
 
+  const refreshWorkspace =
+    useCallback(async () => {
+      setRefreshing(true);
+
+      try {
+        await loadWorkspace();
+      } catch (
+        requestError
+      ) {
+        setError(
+          requestError.message ||
+            "Unable to refresh your workspace."
+        );
+      } finally {
+        setRefreshing(false);
+      }
+    }, [loadWorkspace]);
+
   const filteredFiles =
-    files.filter((file) => {
-      const matchesSearch =
-        file.original_name
-          .toLowerCase()
-          .includes(
-            search
-              .trim()
-              .toLowerCase()
-          );
+    useMemo(
+      () =>
+        files.filter(
+          (file) => {
+            const fileName =
+              String(
+                file.original_name ||
+                  ""
+              ).toLowerCase();
 
-      const matchesCategory =
-        category === "all" ||
-        file.category ===
-          category;
+            const matchesSearch =
+              fileName.includes(
+                search
+                  .trim()
+                  .toLowerCase()
+              );
 
-      return (
-        matchesSearch &&
-        matchesCategory
-      );
-    });
+            const matchesCategory =
+              category ===
+                "all" ||
+              file.category ===
+                category;
 
-  const totalBytes =
-    files.reduce(
-      (total, file) =>
-        total +
-        Number(
-          file.size_bytes || 0
+            return (
+              matchesSearch &&
+              matchesCategory
+            );
+          }
         ),
-      0
+      [
+        files,
+        search,
+        category,
+      ]
     );
 
-  function formatSize(
-    bytes
-  ) {
-    if (bytes < 1024) {
-      return `${bytes} B`;
-    }
+  const totalBytes =
+    useMemo(
+      () =>
+        files.reduce(
+          (
+            total,
+            file
+          ) =>
+            total +
+            Number(
+              file.size_bytes ||
+                0
+            ),
+          0
+        ),
+      [files]
+    );
 
-    if (
-      bytes <
-      1024 * 1024
-    ) {
-      return `${(
-        bytes / 1024
-      ).toFixed(1)} KB`;
-    }
+  const defaultBucket =
+    useMemo(
+      () =>
+        buckets.find(
+          (bucket) =>
+            bucket.is_default
+        ) || null,
+      [buckets]
+    );
 
-    if (
-      bytes <
-      1024 *
-        1024 *
-        1024
-    ) {
-      return `${(
-        bytes /
-        (1024 * 1024)
-      ).toFixed(1)} MB`;
-    }
+  const awsConnected =
+    connection?.status ===
+    "CONNECTED";
 
-    return `${(
-      bytes /
-      (1024 *
-        1024 *
-        1024)
-    ).toFixed(1)} GB`;
-  }
+  const closeMobileSidebar =
+    () => {
+      setMobileSidebarOpen(
+        false
+      );
+    };
+
+  const openUpload =
+    () => {
+      closeMobileSidebar();
+
+      setUploadOpen(true);
+    };
+
+  const goToStorage =
+    () => {
+      closeMobileSidebar();
+
+      navigate(
+        "/aws-storage"
+      );
+    };
+
+  const goToShared =
+    () => {
+      closeMobileSidebar();
+
+      navigate(
+        "/shared"
+      );
+    };
+
+  const firstName =
+    user?.name
+      ?.trim()
+      ?.split(/\s+/)[0] ||
+    "";
 
   return (
     <main className="dashboard-page">
-      <aside className="sidebar">
+      <aside
+        className={`dashboard-sidebar ${
+          mobileSidebarOpen
+            ? "mobile-open"
+            : ""
+        }`}
+      >
         <div>
-          <div className="brand dashboard-brand">
-            <div className="brand-mark">
-              <Cloud
-                size={20}
-              />
-            </div>
+          <div className="dashboard-sidebar-top">
+            <DashboardBrand />
 
-            <span>
-              CloudDrop
-            </span>
+            <button
+              className="dashboard-sidebar-close"
+              type="button"
+              aria-label="Close navigation"
+              onClick={
+                closeMobileSidebar
+              }
+            >
+              <X size={19} />
+            </button>
           </div>
 
-          <nav className="sidebar-nav">
-            <button className="sidebar-link active">
+          <nav className="dashboard-sidebar-nav">
+            <span className="dashboard-nav-label">
+              Workspace
+            </span>
+
+            <button
+              className="dashboard-nav-link active"
+              type="button"
+              onClick={
+                closeMobileSidebar
+              }
+            >
               <FileText
                 size={18}
               />
 
-              My Files
+              <span>
+                My Files
+              </span>
             </button>
 
             <button
-              className="sidebar-link"
-              onClick={() =>
-                setUploadOpen(
-                  true
-                )
+              className="dashboard-nav-link"
+              type="button"
+              onClick={
+                openUpload
               }
             >
               <UploadCloud
                 size={18}
               />
 
-              Upload
+              <span>
+                Upload
+              </span>
             </button>
 
-            <button className="sidebar-link">
+            <button
+              className="dashboard-nav-link"
+              type="button"
+              onClick={
+                goToShared
+              }
+            >
               <Share2
                 size={18}
               />
 
-              Shared
+              <span>
+                Shared
+              </span>
+            </button>
+
+            <span className="dashboard-nav-label dashboard-storage-label">
+              Storage
+            </span>
+
+            <button
+              className="dashboard-nav-link"
+              type="button"
+              onClick={
+                goToStorage
+              }
+            >
+              <HardDrive
+                size={18}
+              />
+
+              <span>
+                CloudDrop Storage
+              </span>
+
+              {awsConnected && (
+                <i className="dashboard-nav-status" />
+              )}
+            </button>
+
+            <button
+              className="dashboard-nav-link dashboard-sub-link"
+              type="button"
+              onClick={
+                goToStorage
+              }
+            >
+              <Database
+                size={16}
+              />
+
+              <span>
+                My AWS
+              </span>
+
+              {buckets.length >
+                0 && (
+                <small>
+                  {
+                    buckets.length
+                  }
+                </small>
+              )}
             </button>
           </nav>
         </div>
 
-        <button
-          className="sidebar-link logout-link"
-          onClick={
-            logout
-          }
-        >
-          <LogOut
-            size={18}
-          />
-
-          Sign out
-        </button>
-      </aside>
-
-      <section className="dashboard-content">
-        <header className="dashboard-header">
-          <div>
-            <span className="muted-label">
-              Workspace
+        <div className="dashboard-sidebar-bottom">
+          <div className="dashboard-user-mini">
+            <span>
+              {user?.name
+                ?.trim()
+                ?.charAt(0)
+                ?.toUpperCase() ||
+                "U"}
             </span>
 
-            <h1>
-              Welcome
-              {user?.name
-                ? `, ${user.name}`
-                : ""}
-            </h1>
+            <div>
+              <strong>
+                {user?.name ||
+                  "CloudDrop User"}
+              </strong>
 
-            <p>
-              Manage your secure
-              cloud files.
-            </p>
+              <small>
+                {user?.email ||
+                  ""}
+              </small>
+            </div>
           </div>
 
           <button
-            className="button button-primary"
+            className="dashboard-nav-link dashboard-logout-link"
+            type="button"
+            onClick={
+              logout
+            }
+          >
+            <LogOut
+              size={18}
+            />
+
+            <span>
+              Sign out
+            </span>
+          </button>
+        </div>
+      </aside>
+
+      {mobileSidebarOpen && (
+        <button
+          className="dashboard-sidebar-backdrop"
+          type="button"
+          aria-label="Close navigation"
+          onClick={
+            closeMobileSidebar
+          }
+        />
+      )}
+
+      <section className="dashboard-content">
+        <header className="dashboard-mobile-header">
+          <DashboardBrand />
+
+          <button
+            type="button"
+            aria-label="Open navigation"
             onClick={() =>
-              setUploadOpen(
+              setMobileSidebarOpen(
                 true
               )
             }
           >
-            <UploadCloud
-              size={18}
-            />
-
-            Upload file
+            <Menu size={21} />
           </button>
         </header>
 
-        <section className="stats-grid">
-          <article className="stat-card">
-            <span>
-              Total files
-            </span>
+        <div className="dashboard-content-inner">
+          <header className="dashboard-header">
+            <div className="dashboard-heading">
+              <span className="dashboard-eyebrow">
+                Workspace
+              </span>
 
-            <strong>
-              {files.length}
-            </strong>
-          </article>
-
-          <article className="stat-card">
-            <span>
-              Storage used
-            </span>
-
-            <strong>
-              {formatSize(
-                totalBytes
-              )}
-            </strong>
-          </article>
-
-          <article className="stat-card">
-            <span>
-              Security
-            </span>
-
-            <strong>
-              Private
-            </strong>
-          </article>
-        </section>
-
-        <section className="files-panel">
-          <div className="files-toolbar">
-            <div>
-              <h2>
-                My Files
-              </h2>
+              <h1>
+                Welcome
+                {firstName
+                  ? `, ${firstName}`
+                  : ""}
+                .
+              </h1>
 
               <p>
-                Files stored securely
-                in your CloudDrop
-                workspace.
+                Manage your files,
+                sharing and cloud
+                storage from one
+                secure workspace.
               </p>
             </div>
 
-            <div className="files-controls">
-              <div className="category-filter">
-                <Filter
-                  size={16}
-                />
-
-                <select
-                  value={category}
-                  onChange={(
-                    event
-                  ) =>
-                    setCategory(
-                      event.target
-                        .value
-                    )
+            <div className="dashboard-header-actions">
+              <button
+                className="dashboard-refresh-button"
+                type="button"
+                aria-label="Refresh workspace"
+                disabled={
+                  refreshing
+                }
+                onClick={
+                  refreshWorkspace
+                }
+              >
+                <RefreshCw
+                  size={17}
+                  className={
+                    refreshing
+                      ? "dashboard-spin"
+                      : ""
                   }
-                >
-                  {CATEGORIES.map(
-                    (item) => (
-                      <option
-                        key={
-                          item
-                        }
-                        value={
-                          item
-                        }
-                      >
-                        {item ===
-                        "all"
-                          ? "All categories"
-                          : item}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
+                />
+              </button>
 
-              <div className="search-box">
-                <Search
+              <button
+                className="dashboard-primary-button"
+                type="button"
+                onClick={
+                  openUpload
+                }
+              >
+                <UploadCloud
                   size={18}
                 />
 
-                <input
-                  value={search}
-                  onChange={(
-                    event
-                  ) =>
-                    setSearch(
-                      event.target
-                        .value
-                    )
-                  }
-                  placeholder="Search files..."
-                />
-              </div>
+                Upload file
+              </button>
             </div>
-          </div>
+          </header>
 
           {error && (
-            <div
-              className="error-banner"
-              style={{
-                margin:
-                  "16px 22px",
-              }}
-            >
-              {error}
+            <div className="dashboard-error-banner">
+              <ShieldCheck
+                size={17}
+              />
+
+              <span>
+                {error}
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setError("")
+                }
+              >
+                <X size={16} />
+              </button>
             </div>
           )}
 
-          {loading ? (
-            <div className="empty-state">
-              <span className="loader-ring" />
-
-              <p>
-                Loading your
-                files...
-              </p>
-            </div>
-          ) : filteredFiles
-              .length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">
-                <File
-                  size={27}
+          <section className="dashboard-stats-grid">
+            <article className="dashboard-stat-card">
+              <div className="dashboard-stat-icon blue">
+                <FileText
+                  size={20}
                 />
               </div>
 
-              <h3>
-                No files found
-              </h3>
+              <span>
+                Total files
+              </span>
 
-              <p>
-                {search ||
-                category !==
-                  "all"
-                  ? "No files match your filters."
-                  : "Upload your first file to CloudDrop."}
-              </p>
-            </div>
-          ) : (
-            <div className="file-table">
-              <div className="file-table-head file-table-with-actions">
-                <span>
-                  Name
-                </span>
+              <strong>
+                {files.length}
+              </strong>
 
-                <span>
-                  Category
-                </span>
+              <small>
+                Stored in your
+                workspace
+              </small>
+            </article>
 
-                <span>
-                  Size
-                </span>
-
-                <span>
-                  Uploaded
-                </span>
-
-                <span />
+            <article className="dashboard-stat-card">
+              <div className="dashboard-stat-icon cyan">
+                <HardDrive
+                  size={20}
+                />
               </div>
 
-              {filteredFiles.map(
-                (file) => (
-                  <div
-                    className="file-table-row file-table-with-actions clickable-file-row"
-                    key={
-                      file.id
+              <span>
+                Storage used
+              </span>
+
+              <strong>
+                {formatSize(
+                  totalBytes
+                )}
+              </strong>
+
+              <small>
+                Across all files
+              </small>
+            </article>
+
+            <article className="dashboard-stat-card">
+              <div className="dashboard-stat-icon green">
+                <ShieldCheck
+                  size={20}
+                />
+              </div>
+
+              <span>
+                Security
+              </span>
+
+              <strong className="dashboard-stat-text">
+                Private
+              </strong>
+
+              <small>
+                Signed access only
+              </small>
+            </article>
+
+            <article
+              className="dashboard-stat-card dashboard-storage-stat"
+              role="button"
+              tabIndex={0}
+              onClick={
+                goToStorage
+              }
+              onKeyDown={(
+                event
+              ) => {
+                if (
+                  event.key ===
+                    "Enter" ||
+                  event.key ===
+                    " "
+                ) {
+                  goToStorage();
+                }
+              }}
+            >
+              <div className="dashboard-stat-icon purple">
+                <Database
+                  size={20}
+                />
+              </div>
+
+              <span>
+                Storage
+              </span>
+
+              <strong className="dashboard-stat-text">
+                {awsConnected
+                  ? "My AWS"
+                  : "Managed"}
+              </strong>
+
+              <small>
+                {awsConnected
+                  ? `${buckets.length} AWS bucket${
+                      buckets.length ===
+                      1
+                        ? ""
+                        : "s"
+                    }`
+                  : "CloudDrop managed"}
+              </small>
+            </article>
+          </section>
+
+          <section className="dashboard-storage-summary">
+            <div className="dashboard-storage-summary-main">
+              <div className="dashboard-storage-summary-icon">
+                <Database
+                  size={21}
+                />
+              </div>
+
+              <div>
+                <span>
+                  Active storage
+                </span>
+
+                <strong>
+                  {awsConnected
+                    ? "Connected AWS storage"
+                    : "CloudDrop Managed Storage"}
+                </strong>
+
+                <p>
+                  {awsConnected
+                    ? defaultBucket
+                      ? `New AWS uploads use ${defaultBucket.bucket_name}.`
+                      : "Your AWS account is connected. Select a default bucket for customer storage."
+                    : "Files can be stored using CloudDrop's managed storage. You can connect AWS at any time."}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={
+                goToStorage
+              }
+            >
+              Manage storage
+            </button>
+          </section>
+
+          <section className="dashboard-files-panel">
+            <div className="dashboard-files-toolbar">
+              <div>
+                <span>
+                  File manager
+                </span>
+
+                <h2>
+                  My Files
+                </h2>
+
+                <p>
+                  Search, inspect,
+                  download and share
+                  your CloudDrop
+                  files.
+                </p>
+              </div>
+
+              <div className="dashboard-files-controls">
+                <div className="dashboard-category-filter">
+                  <Filter
+                    size={16}
+                  />
+
+                  <select
+                    value={
+                      category
                     }
-                    onClick={() =>
-                      setSelectedFile(
-                        file
+                    onChange={(
+                      event
+                    ) =>
+                      setCategory(
+                        event
+                          .target
+                          .value
                       )
                     }
                   >
-                    <div className="file-name-cell">
-                      <div className="file-icon-small">
-                        <FileText
-                          size={
-                            18
+                    {CATEGORIES.map(
+                      (item) => (
+                        <option
+                          key={
+                            item
                           }
-                        />
-                      </div>
-
-                      <div>
-                        <strong>
-                          {
-                            file.original_name
+                          value={
+                            item
                           }
-                        </strong>
+                        >
+                          {item ===
+                          "all"
+                            ? "All categories"
+                            : item}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
 
-                        <span>
-                          {
-                            file.mime_type
-                          }
-                        </span>
-                      </div>
-                    </div>
+                <div className="dashboard-search-box">
+                  <Search
+                    size={17}
+                  />
 
-                    <span className="category-pill">
-                      {
-                        file.category
-                      }
-                    </span>
+                  <input
+                    value={
+                      search
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setSearch(
+                        event
+                          .target
+                          .value
+                      )
+                    }
+                    placeholder="Search files..."
+                  />
 
-                    <span>
-                      {formatSize(
-                        Number(
-                          file.size_bytes
-                        )
-                      )}
-                    </span>
-
-                    <span>
-                      {new Date(
-                        file.uploaded_at
-                      ).toLocaleDateString()}
-                    </span>
-
+                  {search && (
                     <button
                       type="button"
-                      className="file-more-button"
-                      onClick={(
-                        event
-                      ) => {
-                        event.stopPropagation();
-
-                        setSelectedFile(
-                          file
-                        );
-                      }}
-                      aria-label={`Open actions for ${file.original_name}`}
+                      aria-label="Clear search"
+                      onClick={() =>
+                        setSearch("")
+                      }
                     >
-                      <MoreHorizontal
-                        size={18}
+                      <X
+                        size={14}
                       />
                     </button>
-                  </div>
-                )
-              )}
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </section>
+
+            {loading ? (
+              <div className="dashboard-empty-state">
+                <span className="dashboard-loader-ring" />
+
+                <h3>
+                  Loading files
+                </h3>
+
+                <p>
+                  Getting your
+                  CloudDrop workspace
+                  ready…
+                </p>
+              </div>
+            ) : filteredFiles.length ===
+              0 ? (
+              <div className="dashboard-empty-state">
+                <div className="dashboard-empty-icon">
+                  <File
+                    size={28}
+                  />
+                </div>
+
+                <h3>
+                  {search ||
+                  category !==
+                    "all"
+                    ? "No matching files"
+                    : "Your workspace is empty"}
+                </h3>
+
+                <p>
+                  {search ||
+                  category !==
+                    "all"
+                    ? "Try changing your search or category filter."
+                    : "Upload your first file to start using CloudDrop."}
+                </p>
+
+                {!search &&
+                  category ===
+                    "all" && (
+                    <button
+                      className="dashboard-primary-button"
+                      type="button"
+                      onClick={
+                        openUpload
+                      }
+                    >
+                      <UploadCloud
+                        size={17}
+                      />
+
+                      Upload file
+                    </button>
+                  )}
+              </div>
+            ) : (
+              <div className="dashboard-file-table">
+                <div className="dashboard-file-table-head">
+                  <span>
+                    Name
+                  </span>
+
+                  <span>
+                    Category
+                  </span>
+
+                  <span>
+                    Storage
+                  </span>
+
+                  <span>
+                    Size
+                  </span>
+
+                  <span>
+                    Uploaded
+                  </span>
+
+                  <span />
+                </div>
+
+                <div className="dashboard-file-list">
+                  {filteredFiles.map(
+                    (file) => (
+                      <div
+                        className="dashboard-file-row"
+                        key={
+                          file.id
+                        }
+                        role="button"
+                        tabIndex={0}
+                        onClick={() =>
+                          setSelectedFile(
+                            file
+                          )
+                        }
+                        onKeyDown={(
+                          event
+                        ) => {
+                          if (
+                            event.key ===
+                              "Enter" ||
+                            event.key ===
+                              " "
+                          ) {
+                            setSelectedFile(
+                              file
+                            );
+                          }
+                        }}
+                      >
+                        <div className="dashboard-file-name-cell">
+                          <div className="dashboard-file-icon">
+                            <FileText
+                              size={18}
+                            />
+                          </div>
+
+                          <div>
+                            <strong>
+                              {
+                                file.original_name
+                              }
+                            </strong>
+
+                            <span>
+                              {file.mime_type ||
+                                "File"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="dashboard-category-pill">
+                          {file.category ||
+                            "other"}
+                        </span>
+
+                        <span className="dashboard-storage-pill">
+                          {formatStorageMode(
+                            file.storage_mode
+                          )}
+                        </span>
+
+                        <span className="dashboard-file-meta">
+                          {formatSize(
+                            Number(
+                              file.size_bytes
+                            )
+                          )}
+                        </span>
+
+                        <span className="dashboard-file-meta">
+                          {new Date(
+                            file.uploaded_at
+                          ).toLocaleDateString()}
+                        </span>
+
+                        <button
+                          type="button"
+                          className="dashboard-file-more"
+                          aria-label={`Open actions for ${file.original_name}`}
+                          onClick={(
+                            event
+                          ) => {
+                            event.stopPropagation();
+
+                            setSelectedFile(
+                              file
+                            );
+                          }}
+                        >
+                          <MoreHorizontal
+                            size={18}
+                          />
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
       </section>
 
       <UploadModal
-        open={uploadOpen}
+        open={
+          uploadOpen
+        }
         onClose={() =>
-          setUploadOpen(false)
+          setUploadOpen(
+            false
+          )
         }
         onUploaded={
-          refreshFiles
+          refreshWorkspace
         }
       />
 
@@ -632,7 +1255,7 @@ export default function Dashboard() {
             )
           }
           onDeleted={
-            refreshFiles
+            refreshWorkspace
           }
         />
       )}

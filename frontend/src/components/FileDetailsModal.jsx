@@ -2,17 +2,22 @@ import {
   Check,
   Clock3,
   Copy,
+  Database,
   Download,
   FileText,
+  HardDrive,
+  Info,
   Link2,
   Loader2,
   Share2,
+  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
 
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -47,6 +52,99 @@ const EXPIRY_OPTIONS = [
   },
 ];
 
+function formatSize(bytes) {
+  const value =
+    Number(bytes || 0);
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (
+    value <
+    1024 * 1024
+  ) {
+    return `${(
+      value / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  if (
+    value <
+    1024 *
+      1024 *
+      1024
+  ) {
+    return `${(
+      value /
+      (1024 * 1024)
+    ).toFixed(1)} MB`;
+  }
+
+  return `${(
+    value /
+    (1024 *
+      1024 *
+      1024)
+  ).toFixed(1)} GB`;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+  return date.toLocaleString();
+}
+
+function getStorageLabel(
+  storageMode
+) {
+  const value =
+    String(
+      storageMode || ""
+    ).toLowerCase();
+
+  if (
+    value.includes(
+      "customer"
+    ) ||
+    value.includes(
+      "aws"
+    )
+  ) {
+    return "My AWS";
+  }
+
+  return "Managed";
+}
+
+function isShareExpired(
+  share
+) {
+  if (!share?.expires_at) {
+    return false;
+  }
+
+  return (
+    new Date(
+      share.expires_at
+    ).getTime() <=
+    Date.now()
+  );
+}
+
 export default function FileDetailsModal({
   file,
   open,
@@ -79,9 +177,19 @@ export default function FileDetailsModal({
   ] = useState(true);
 
   const [
+    downloading,
+    setDownloading,
+  ] = useState(false);
+
+  const [
     shareCreating,
     setShareCreating,
   ] = useState(false);
+
+  const [
+    revokingId,
+    setRevokingId,
+  ] = useState("");
 
   const [
     deleting,
@@ -109,7 +217,10 @@ export default function FileDetailsModal({
   ] = useState(false);
 
   useEffect(() => {
-    if (!open || !file?.id) {
+    if (
+      !open ||
+      !file?.id
+    ) {
       return undefined;
     }
 
@@ -135,13 +246,15 @@ export default function FileDetailsModal({
         }
 
         setMetadata(
-          metadataResponse.data.data
-            .file
+          metadataResponse
+            ?.data?.data
+            ?.file || file
         );
 
         setShares(
-          sharesResponse.data.data
-            .shares
+          sharesResponse
+            ?.data?.data
+            ?.shares || []
         );
       } catch (
         requestError
@@ -151,14 +264,18 @@ export default function FileDetailsModal({
         }
 
         setError(
-          requestError.response?.data
+          requestError
+            ?.response?.data
             ?.message ||
             "Unable to load file details."
         );
       } finally {
         if (active) {
           setLoading(false);
-          setSharesLoading(false);
+
+          setSharesLoading(
+            false
+          );
         }
       }
     }
@@ -168,9 +285,31 @@ export default function FileDetailsModal({
     return () => {
       active = false;
     };
-  }, [open, file?.id]);
+  }, [
+    open,
+    file,
+  ]);
 
-  if (!open || !file) {
+  const currentFile =
+    metadata || file;
+
+  const storageLabel =
+    useMemo(
+      () =>
+        getStorageLabel(
+          currentFile
+            ?.storage_mode
+        ),
+      [
+        currentFile
+          ?.storage_mode,
+      ]
+    );
+
+  if (
+    !open ||
+    !file
+  ) {
     return null;
   }
 
@@ -184,11 +323,16 @@ export default function FileDetailsModal({
         );
 
       setShares(
-        response.data.data.shares
+        response
+          ?.data?.data
+          ?.shares || []
       );
-    } catch (requestError) {
+    } catch (
+      requestError
+    ) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
           "Unable to load share links."
       );
@@ -199,6 +343,7 @@ export default function FileDetailsModal({
 
   async function handleDownload() {
     try {
+      setDownloading(true);
       setError("");
 
       const response =
@@ -207,16 +352,20 @@ export default function FileDetailsModal({
         );
 
       const url =
-        response.data.data.downloadUrl;
+        response
+          ?.data?.data
+          ?.downloadUrl;
 
       if (!url) {
         throw new Error(
-          "Download URL was not returned"
+          "Download URL was not returned."
         );
       }
 
       const anchor =
-        document.createElement("a");
+        document.createElement(
+          "a"
+        );
 
       anchor.href = url;
 
@@ -230,12 +379,17 @@ export default function FileDetailsModal({
       anchor.click();
 
       anchor.remove();
-    } catch (requestError) {
+    } catch (
+      requestError
+    ) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
           "Unable to download file."
       );
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -255,16 +409,30 @@ export default function FileDetailsModal({
         );
 
       const createdShare =
-        response.data.data.share;
+        response
+          ?.data?.data
+          ?.share;
+
+      if (
+        !createdShare
+          ?.shareUrl
+      ) {
+        throw new Error(
+          "Share URL was not returned."
+        );
+      }
 
       setShareUrl(
         createdShare.shareUrl
       );
 
       await refreshShares();
-    } catch (requestError) {
+    } catch (
+      requestError
+    ) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
           "Unable to create share link."
       );
@@ -298,6 +466,10 @@ export default function FileDetailsModal({
     shareId
   ) {
     try {
+      setRevokingId(
+        shareId
+      );
+
       setError("");
 
       await api.delete(
@@ -307,18 +479,24 @@ export default function FileDetailsModal({
       await refreshShares();
 
       setShareUrl("");
-    } catch (requestError) {
+    } catch (
+      requestError
+    ) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
           "Unable to revoke share link."
       );
+    } finally {
+      setRevokingId("");
     }
   }
 
   async function handleDelete() {
     if (!confirmDelete) {
       setConfirmDelete(true);
+
       return;
     }
 
@@ -330,12 +508,17 @@ export default function FileDetailsModal({
         `/api/files/${file.id}`
       );
 
-      await onDeleted();
+      if (onDeleted) {
+        await onDeleted();
+      }
 
       onClose();
-    } catch (requestError) {
+    } catch (
+      requestError
+    ) {
       setError(
-        requestError.response?.data
+        requestError
+          ?.response?.data
           ?.message ||
           "Unable to delete file."
       );
@@ -346,55 +529,25 @@ export default function FileDetailsModal({
     }
   }
 
-  function formatSize(
-    bytes
-  ) {
-    const value =
-      Number(bytes || 0);
-
-    if (value < 1024) {
-      return `${value} B`;
-    }
-
-    if (
-      value <
-      1024 * 1024
-    ) {
-      return `${(
-        value / 1024
-      ).toFixed(1)} KB`;
-    }
-
-    return `${(
-      value /
-      (1024 * 1024)
-    ).toFixed(1)} MB`;
-  }
-
-  function formatDate(
-    value
-  ) {
-    if (!value) {
-      return "—";
-    }
-
-    return new Date(
-      value
-    ).toLocaleString();
-  }
-
-  const currentFile =
-    metadata || file;
+  const busy =
+    deleting ||
+    downloading ||
+    shareCreating;
 
   return (
     <div
-      className="modal-backdrop"
-      onMouseDown={
-        onClose
-      }
+      className="file-details-backdrop"
+      onMouseDown={() => {
+        if (!busy) {
+          onClose();
+        }
+      }}
     >
       <section
         className="file-details-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="file-details-title"
         onMouseDown={(
           event
         ) =>
@@ -405,18 +558,25 @@ export default function FileDetailsModal({
           <div className="file-details-title">
             <div className="file-details-icon">
               <FileText
-                size={22}
+                size={21}
               />
             </div>
 
             <div>
-              <span className="muted-label">
+              <span className="file-details-kicker">
                 File details
               </span>
 
-              <h2>
+              <h2
+                id="file-details-title"
+                title={
+                  currentFile
+                    ?.original_name
+                }
+              >
                 {
-                  currentFile.original_name
+                  currentFile
+                    ?.original_name
                 }
               </h2>
             </div>
@@ -424,131 +584,218 @@ export default function FileDetailsModal({
 
           <button
             type="button"
-            className="modal-close"
+            className="file-details-close"
             onClick={onClose}
+            disabled={busy}
             aria-label="Close file details"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </header>
 
         {error && (
-          <div className="error-banner file-details-error">
-            {error}
+          <div
+            className="file-details-error"
+            role="alert"
+          >
+            <Info size={16} />
+
+            <span>
+              {error}
+            </span>
+
+            <button
+              type="button"
+              aria-label="Dismiss error"
+              onClick={() =>
+                setError("")
+              }
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
 
         {loading ? (
-          <div className="details-loading">
+          <div className="file-details-loading">
             <Loader2
-              className="spinner"
+              className="file-details-spin"
               size={21}
             />
 
-            Loading details...
+            <span>
+              Loading file details…
+            </span>
           </div>
         ) : (
-          <div className="metadata-grid">
-            <div>
-              <span>
-                Type
-              </span>
-
-              <strong>
-                {
-                  currentFile.mime_type
-                }
-              </strong>
-            </div>
-
-            <div>
-              <span>
-                Category
-              </span>
-
-              <strong className="metadata-category">
-                {
-                  currentFile.category
-                }
-              </strong>
-            </div>
-
-            <div>
-              <span>
-                Size
-              </span>
-
-              <strong>
-                {formatSize(
-                  currentFile.size_bytes
+          <>
+            <section className="file-details-storage-card">
+              <div className="file-details-storage-icon">
+                {storageLabel ===
+                "My AWS" ? (
+                  <Database
+                    size={18}
+                  />
+                ) : (
+                  <HardDrive
+                    size={18}
+                  />
                 )}
-              </strong>
-            </div>
+              </div>
 
-            <div>
-              <span>
-                Uploaded
-              </span>
+              <div>
+                <span>
+                  Storage location
+                </span>
 
-              <strong>
-                {formatDate(
-                  currentFile.uploaded_at
-                )}
-              </strong>
-            </div>
-          </div>
+                <strong>
+                  {storageLabel}
+                </strong>
+
+                <p>
+                  {storageLabel ===
+                  "My AWS"
+                    ? "Stored in your connected AWS S3 storage."
+                    : "Stored securely in CloudDrop managed storage."}
+                </p>
+              </div>
+
+              <ShieldCheck
+                className="file-details-storage-shield"
+                size={18}
+              />
+            </section>
+
+            <section className="file-details-metadata-grid">
+              <article>
+                <span>
+                  Type
+                </span>
+
+                <strong>
+                  {currentFile
+                    ?.mime_type ||
+                    "Unknown"}
+                </strong>
+              </article>
+
+              <article>
+                <span>
+                  Category
+                </span>
+
+                <strong className="file-details-category">
+                  {currentFile
+                    ?.category ||
+                    "Other"}
+                </strong>
+              </article>
+
+              <article>
+                <span>
+                  Size
+                </span>
+
+                <strong>
+                  {formatSize(
+                    currentFile
+                      ?.size_bytes
+                  )}
+                </strong>
+              </article>
+
+              <article>
+                <span>
+                  Uploaded
+                </span>
+
+                <strong>
+                  {formatDate(
+                    currentFile
+                      ?.uploaded_at
+                  )}
+                </strong>
+              </article>
+            </section>
+
+            {currentFile
+              ?.description && (
+              <section className="file-details-description">
+                <span>
+                  Description
+                </span>
+
+                <p>
+                  {
+                    currentFile
+                      .description
+                  }
+                </p>
+              </section>
+            )}
+          </>
         )}
 
-        {currentFile.description && (
-          <div className="file-description-card">
-            <span>
-              Description
-            </span>
-
-            <p>
-              {
-                currentFile.description
-              }
-            </p>
-          </div>
-        )}
-
-        <div className="primary-file-actions">
+        <section className="file-details-primary-actions">
           <button
             type="button"
-            className="button button-primary"
+            className="file-details-download-button"
             onClick={
               handleDownload
             }
+            disabled={
+              downloading ||
+              loading
+            }
           >
-            <Download
-              size={18}
-            />
+            {downloading ? (
+              <>
+                <Loader2
+                  className="file-details-spin"
+                  size={17}
+                />
 
-            Download
+                Preparing…
+              </>
+            ) : (
+              <>
+                <Download
+                  size={17}
+                />
+
+                Download
+              </>
+            )}
           </button>
 
           <button
             type="button"
-            className="button button-secondary"
+            className={`file-details-delete-button ${
+              confirmDelete
+                ? "confirm"
+                : ""
+            }`}
             onClick={
               handleDelete
             }
-            disabled={deleting}
+            disabled={
+              deleting ||
+              loading
+            }
           >
             {deleting ? (
               <>
                 <Loader2
-                  size={18}
-                  className="spinner"
+                  className="file-details-spin"
+                  size={17}
                 />
 
-                Deleting...
+                Deleting…
               </>
             ) : (
               <>
                 <Trash2
-                  size={18}
+                  size={17}
                 />
 
                 {confirmDelete
@@ -557,13 +804,22 @@ export default function FileDetailsModal({
               </>
             )}
           </button>
-        </div>
+        </section>
 
         {confirmDelete && (
-          <div className="delete-warning">
-            This permanently deletes
-            the file from both
-            CloudDrop metadata and S3.
+          <div className="file-details-delete-warning">
+            <div>
+              <Info
+                size={16}
+              />
+            </div>
+
+            <p>
+              This permanently removes
+              the file from CloudDrop
+              metadata and its storage
+              destination.
+            </p>
 
             <button
               type="button"
@@ -572,18 +828,19 @@ export default function FileDetailsModal({
                   false
                 )
               }
+              disabled={deleting}
             >
               Cancel
             </button>
           </div>
         )}
 
-        <div className="modal-divider" />
+        <div className="file-details-divider" />
 
-        <section className="sharing-section">
-          <div className="sharing-heading">
+        <section className="file-details-sharing">
+          <div className="file-details-sharing-heading">
             <div>
-              <span className="muted-label">
+              <span>
                 Temporary sharing
               </span>
 
@@ -592,72 +849,85 @@ export default function FileDetailsModal({
               </h3>
             </div>
 
-            <Share2
-              size={20}
-            />
+            <div className="file-details-share-icon">
+              <Share2
+                size={19}
+              />
+            </div>
           </div>
 
-          <p className="sharing-description">
+          <p className="file-details-sharing-description">
             Create an expiring public
-            link. Recipients do not
-            need a CloudDrop account.
+            link. Recipients can
+            download the file without
+            signing in to CloudDrop.
           </p>
 
-          <div className="share-create-row">
-            <select
-              value={expiry}
-              onChange={(
-                event
-              ) =>
-                setExpiry(
-                  Number(
-                    event.target
-                      .value
+          <div className="file-details-share-create">
+            <label>
+              <span>
+                Link expires in
+              </span>
+
+              <select
+                value={expiry}
+                onChange={(
+                  event
+                ) =>
+                  setExpiry(
+                    Number(
+                      event
+                        .target
+                        .value
+                    )
                   )
-                )
-              }
-            >
-              {EXPIRY_OPTIONS.map(
-                (option) => (
-                  <option
-                    key={
-                      option.value
-                    }
-                    value={
-                      option.value
-                    }
-                  >
-                    {
-                      option.label
-                    }
-                  </option>
-                )
-              )}
-            </select>
+                }
+                disabled={
+                  shareCreating
+                }
+              >
+                {EXPIRY_OPTIONS.map(
+                  (option) => (
+                    <option
+                      key={
+                        option.value
+                      }
+                      value={
+                        option.value
+                      }
+                    >
+                      {
+                        option.label
+                      }
+                    </option>
+                  )
+                )}
+              </select>
+            </label>
 
             <button
               type="button"
-              className="button button-primary"
               onClick={
                 handleCreateShare
               }
               disabled={
-                shareCreating
+                shareCreating ||
+                loading
               }
             >
               {shareCreating ? (
                 <>
                   <Loader2
-                    className="spinner"
-                    size={18}
+                    className="file-details-spin"
+                    size={17}
                   />
 
-                  Creating...
+                  Creating…
                 </>
               ) : (
                 <>
                   <Link2
-                    size={18}
+                    size={17}
                   />
 
                   Create link
@@ -667,13 +937,17 @@ export default function FileDetailsModal({
           </div>
 
           {shareUrl && (
-            <div className="generated-share">
+            <div className="file-details-generated-share">
               <div>
                 <span>
                   New share link
                 </span>
 
-                <p>
+                <p
+                  title={
+                    shareUrl
+                  }
+                >
                   {shareUrl}
                 </p>
               </div>
@@ -685,92 +959,124 @@ export default function FileDetailsModal({
                     shareUrl
                   )
                 }
+                aria-label="Copy share link"
               >
                 {copied ? (
                   <Check
-                    size={18}
+                    size={17}
                   />
                 ) : (
                   <Copy
-                    size={18}
+                    size={17}
                   />
                 )}
               </button>
             </div>
           )}
 
-          <div className="existing-shares">
-            <div className="existing-shares-heading">
-              <strong>
-                Existing links
-              </strong>
+          <div className="file-details-existing-shares">
+            <div className="file-details-existing-heading">
+              <div>
+                <strong>
+                  Existing links
+                </strong>
 
-              <span>
+                <span>
+                  Previously created
+                  temporary links.
+                </span>
+              </div>
+
+              <small>
                 {shares.length}
-              </span>
+              </small>
             </div>
 
             {sharesLoading ? (
-              <div className="share-loading">
+              <div className="file-details-share-state">
                 <Loader2
-                  className="spinner"
-                  size={17}
+                  className="file-details-spin"
+                  size={16}
                 />
 
-                Loading...
+                Loading links…
               </div>
             ) : shares.length ===
               0 ? (
-              <div className="no-shares">
+              <div className="file-details-share-state">
+                <Link2
+                  size={16}
+                />
+
                 No share links have
                 been created yet.
               </div>
             ) : (
-              shares.map(
-                (share) => (
-                  <div
-                    className="share-row"
-                    key={
-                      share.id
-                    }
-                  >
-                    <div className="share-status-icon">
-                      <Clock3
-                        size={17}
-                      />
-                    </div>
+              <div className="file-details-share-list">
+                {shares.map(
+                  (share) => {
+                    const expired =
+                      isShareExpired(
+                        share
+                      );
 
-                    <div className="share-info">
-                      <strong>
-                        {share.active
-                          ? "Active link"
-                          : "Expired link"}
-                      </strong>
-
-                      <span>
-                        Expires{" "}
-                        {formatDate(
-                          share.expires_at
-                        )}
-                      </span>
-                    </div>
-
-                    {share.active && (
-                      <button
-                        type="button"
-                        className="revoke-button"
-                        onClick={() =>
-                          handleRevoke(
-                            share.id
-                          )
+                    return (
+                      <article
+                        className={`file-details-share-row ${
+                          expired
+                            ? "expired"
+                            : ""
+                        }`}
+                        key={
+                          share.id
                         }
                       >
-                        Revoke
-                      </button>
-                    )}
-                  </div>
-                )
-              )
+                        <div className="file-details-share-status-icon">
+                          <Clock3
+                            size={16}
+                          />
+                        </div>
+
+                        <div className="file-details-share-info">
+                          <strong>
+                            {expired
+                              ? "Expired link"
+                              : "Active link"}
+                          </strong>
+
+                          <span>
+                            Expires{" "}
+                            {formatDate(
+                              share.expires_at
+                            )}
+                          </span>
+                        </div>
+
+                        {!expired && (
+                          <button
+                            type="button"
+                            className="file-details-revoke-button"
+                            disabled={
+                              revokingId ===
+                              share.id
+                            }
+                            onClick={() =>
+                              handleRevoke(
+                                share.id
+                              )
+                            }
+                          >
+                            {revokingId ===
+                            share.id
+                              ? "Revoking…"
+                              : "Revoke"}
+                          </button>
+                        )}
+                      </article>
+                    );
+                  }
+                )}
+              </div>
             )}
           </div>
         </section>
