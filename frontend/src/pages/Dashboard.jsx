@@ -2,7 +2,9 @@ import {
   Cloud,
   File,
   FileText,
+  Filter,
   LogOut,
+  MoreHorizontal,
   Search,
   Share2,
   UploadCloud,
@@ -21,7 +23,18 @@ import {
 
 import api from "../api/client";
 
+import FileDetailsModal from "../components/FileDetailsModal";
 import UploadModal from "../components/UploadModal";
+
+const CATEGORIES = [
+  "all",
+  "documents",
+  "images",
+  "spreadsheets",
+  "archives",
+  "text",
+  "other",
+];
 
 export default function Dashboard() {
   const navigate =
@@ -38,6 +51,11 @@ export default function Dashboard() {
   ] = useState("");
 
   const [
+    category,
+    setCategory,
+  ] = useState("all");
+
+  const [
     loading,
     setLoading,
   ] = useState(true);
@@ -51,6 +69,11 @@ export default function Dashboard() {
     uploadOpen,
     setUploadOpen,
   ] = useState(false);
+
+  const [
+    selectedFile,
+    setSelectedFile,
+  ] = useState(null);
 
   const user = useMemo(() => {
     try {
@@ -121,15 +144,26 @@ export default function Dashboard() {
   }, [loadFiles]);
 
   const filteredFiles =
-    files.filter((file) =>
-      file.original_name
-        .toLowerCase()
-        .includes(
-          search
-            .trim()
-            .toLowerCase()
-        )
-    );
+    files.filter((file) => {
+      const matchesSearch =
+        file.original_name
+          .toLowerCase()
+          .includes(
+            search
+              .trim()
+              .toLowerCase()
+          );
+
+      const matchesCategory =
+        category === "all" ||
+        file.category ===
+          category;
+
+      return (
+        matchesSearch &&
+        matchesCategory
+      );
+    });
 
   const totalBytes =
     files.reduce(
@@ -325,23 +359,61 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="search-box">
-              <Search
-                size={18}
-              />
+            <div className="files-controls">
+              <div className="category-filter">
+                <Filter
+                  size={16}
+                />
 
-              <input
-                value={search}
-                onChange={(
-                  event
-                ) =>
-                  setSearch(
-                    event.target
-                      .value
-                  )
-                }
-                placeholder="Search files..."
-              />
+                <select
+                  value={category}
+                  onChange={(
+                    event
+                  ) =>
+                    setCategory(
+                      event.target
+                        .value
+                    )
+                  }
+                >
+                  {CATEGORIES.map(
+                    (item) => (
+                      <option
+                        key={
+                          item
+                        }
+                        value={
+                          item
+                        }
+                      >
+                        {item ===
+                        "all"
+                          ? "All categories"
+                          : item}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div className="search-box">
+                <Search
+                  size={18}
+                />
+
+                <input
+                  value={search}
+                  onChange={(
+                    event
+                  ) =>
+                    setSearch(
+                      event.target
+                        .value
+                    )
+                  }
+                  placeholder="Search files..."
+                />
+              </div>
             </div>
           </div>
 
@@ -380,14 +452,16 @@ export default function Dashboard() {
               </h3>
 
               <p>
-                {search
-                  ? "No files match your search."
+                {search ||
+                category !==
+                  "all"
+                  ? "No files match your filters."
                   : "Upload your first file to CloudDrop."}
               </p>
             </div>
           ) : (
             <div className="file-table">
-              <div className="file-table-head">
+              <div className="file-table-head file-table-with-actions">
                 <span>
                   Name
                 </span>
@@ -403,14 +477,21 @@ export default function Dashboard() {
                 <span>
                   Uploaded
                 </span>
+
+                <span />
               </div>
 
               {filteredFiles.map(
                 (file) => (
                   <div
-                    className="file-table-row"
+                    className="file-table-row file-table-with-actions clickable-file-row"
                     key={
                       file.id
+                    }
+                    onClick={() =>
+                      setSelectedFile(
+                        file
+                      )
                     }
                   >
                     <div className="file-name-cell">
@@ -456,6 +537,25 @@ export default function Dashboard() {
                         file.uploaded_at
                       ).toLocaleDateString()}
                     </span>
+
+                    <button
+                      type="button"
+                      className="file-more-button"
+                      onClick={(
+                        event
+                      ) => {
+                        event.stopPropagation();
+
+                        setSelectedFile(
+                          file
+                        );
+                      }}
+                      aria-label={`Open actions for ${file.original_name}`}
+                    >
+                      <MoreHorizontal
+                        size={18}
+                      />
+                    </button>
                   </div>
                 )
               )}
@@ -470,6 +570,25 @@ export default function Dashboard() {
           setUploadOpen(false)
         }
         onUploaded={
+          loadFiles
+        }
+      />
+
+      <FileDetailsModal
+        open={
+          Boolean(
+            selectedFile
+          )
+        }
+        file={
+          selectedFile
+        }
+        onClose={() =>
+          setSelectedFile(
+            null
+          )
+        }
+        onDeleted={
           loadFiles
         }
       />
