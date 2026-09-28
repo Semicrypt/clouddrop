@@ -71,12 +71,12 @@ export default function FileDetailsModal({
   const [
     loading,
     setLoading,
-  ] = useState(false);
+  ] = useState(true);
 
   const [
     sharesLoading,
     setSharesLoading,
-  ] = useState(false);
+  ] = useState(true);
 
   const [
     shareCreating,
@@ -110,46 +110,71 @@ export default function FileDetailsModal({
 
   useEffect(() => {
     if (!open || !file?.id) {
-      return;
+      return undefined;
     }
 
-    loadMetadata();
-    loadShares();
+    let active = true;
 
-    setShareUrl("");
-    setCopied(false);
-    setConfirmDelete(false);
-    setError("");
+    async function loadInitialData() {
+      try {
+        const [
+          metadataResponse,
+          sharesResponse,
+        ] = await Promise.all([
+          api.get(
+            `/api/files/${file.id}`
+          ),
+
+          api.get(
+            `/api/files/${file.id}/shares`
+          ),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setMetadata(
+          metadataResponse.data.data
+            .file
+        );
+
+        setShares(
+          sharesResponse.data.data
+            .shares
+        );
+      } catch (
+        requestError
+      ) {
+        if (!active) {
+          return;
+        }
+
+        setError(
+          requestError.response?.data
+            ?.message ||
+            "Unable to load file details."
+        );
+      } finally {
+        if (active) {
+          setLoading(false);
+          setSharesLoading(false);
+        }
+      }
+    }
+
+    loadInitialData();
+
+    return () => {
+      active = false;
+    };
   }, [open, file?.id]);
 
   if (!open || !file) {
     return null;
   }
 
-  async function loadMetadata() {
-    try {
-      setLoading(true);
-
-      const response =
-        await api.get(
-          `/api/files/${file.id}`
-        );
-
-      setMetadata(
-        response.data.data.file
-      );
-    } catch (requestError) {
-      setError(
-        requestError.response?.data
-          ?.message ||
-          "Unable to load file details."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadShares() {
+  async function refreshShares() {
     try {
       setSharesLoading(true);
 
@@ -236,7 +261,7 @@ export default function FileDetailsModal({
         createdShare.shareUrl
       );
 
-      await loadShares();
+      await refreshShares();
     } catch (requestError) {
       setError(
         requestError.response?.data
@@ -279,7 +304,7 @@ export default function FileDetailsModal({
         `/api/files/${file.id}/share/${shareId}`
       );
 
-      await loadShares();
+      await refreshShares();
 
       setShareUrl("");
     } catch (requestError) {

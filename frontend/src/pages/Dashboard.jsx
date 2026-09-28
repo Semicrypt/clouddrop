@@ -105,10 +105,9 @@ export default function Dashboard() {
       );
     }, [navigate]);
 
-  const loadFiles =
+  const refreshFiles =
     useCallback(async () => {
       try {
-        setLoading(true);
         setError("");
 
         const response =
@@ -134,14 +133,58 @@ export default function Dashboard() {
         setError(
           "Unable to load your files."
         );
-      } finally {
-        setLoading(false);
       }
     }, [logout]);
 
   useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+    let active = true;
+
+    async function loadInitialFiles() {
+      try {
+        const response =
+          await api.get(
+            "/api/files"
+          );
+
+        if (!active) {
+          return;
+        }
+
+        setFiles(
+          response.data.data
+            .files
+        );
+      } catch (
+        requestError
+      ) {
+        if (!active) {
+          return;
+        }
+
+        if (
+          requestError.response
+            ?.status === 401
+        ) {
+          logout();
+          return;
+        }
+
+        setError(
+          "Unable to load your files."
+        );
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadInitialFiles();
+
+    return () => {
+      active = false;
+    };
+  }, [logout]);
 
   const filteredFiles =
     files.filter((file) => {
@@ -570,28 +613,29 @@ export default function Dashboard() {
           setUploadOpen(false)
         }
         onUploaded={
-          loadFiles
+          refreshFiles
         }
       />
 
-      <FileDetailsModal
-        open={
-          Boolean(
+      {selectedFile && (
+        <FileDetailsModal
+          key={
+            selectedFile.id
+          }
+          open
+          file={
             selectedFile
-          )
-        }
-        file={
-          selectedFile
-        }
-        onClose={() =>
-          setSelectedFile(
-            null
-          )
-        }
-        onDeleted={
-          loadFiles
-        }
-      />
+          }
+          onClose={() =>
+            setSelectedFile(
+              null
+            )
+          }
+          onDeleted={
+            refreshFiles
+          }
+        />
+      )}
     </main>
   );
 }
