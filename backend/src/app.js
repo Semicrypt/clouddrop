@@ -8,18 +8,23 @@ import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import fileRoutes from "./routes/file.routes.js";
 import shareRoutes from "./routes/share.routes.js";
+import awsRoutes from "./routes/aws.routes.js";
 
-const app = express();
+const app =
+  express();
 
-app.disable("x-powered-by");
+app.disable(
+  "x-powered-by"
+);
 
-// Security middleware
-app.use(helmet());
+app.use(
+  helmet()
+);
 
-// CORS
-app.use(cors());
+app.use(
+  cors()
+);
 
-// Request parsing
 app.use(
   express.json({
     limit: "2mb",
@@ -33,65 +38,68 @@ app.use(
   })
 );
 
-// Logging
 app.use(
   morgan("combined")
 );
 
-// Root endpoint
-app.get("/", (req, res) => {
-  return res
-    .status(200)
-    .json({
-      success: true,
+app.get(
+  "/",
+  (req, res) => {
+    return res
+      .status(200)
+      .json({
+        success: true,
 
-      name:
-        "CloudDrop API",
+        name:
+          "CloudDrop API",
 
-      description:
-        "Secure Cloud File Storage Platform on AWS",
+        description:
+          "Secure Cloud File Storage Platform on AWS",
 
-      version:
-        "1.0.0",
-    });
-});
+        version:
+          "1.0.0",
+      });
+  }
+);
 
-// Health
 app.use(
   "/health",
   healthRoutes
 );
 
-// Authentication
 app.use(
   "/api/auth",
   authRoutes
 );
 
-// Authenticated file management
 app.use(
   "/api/files",
   fileRoutes
 );
 
-// Public temporary share links
 app.use(
   "/api/share",
   shareRoutes
 );
 
-// 404
-app.use((req, res) => {
-  return res
-    .status(404)
-    .json({
-      success: false,
-      message:
-        "Route not found",
-    });
-});
+app.use(
+  "/api/aws",
+  awsRoutes
+);
 
-// Global error handler
+app.use(
+  (req, res) => {
+    return res
+      .status(404)
+      .json({
+        success: false,
+
+        message:
+          "Route not found",
+      });
+  }
+);
+
 app.use(
   (
     error,
@@ -99,9 +107,15 @@ app.use(
     res,
     next
   ) => {
-    console.error(error);
+    if (
+      !error.status ||
+      error.status >= 500
+    ) {
+      console.error(
+        error
+      );
+    }
 
-    // Zod validation
     if (
       error.name ===
       "ZodError"
@@ -129,7 +143,6 @@ app.use(
         });
     }
 
-    // Multer
     if (
       error instanceof
       multer.MulterError
@@ -184,15 +197,19 @@ app.use(
         .status(400)
         .json({
           success: false,
+
           message:
             error.message,
         });
     }
 
-    // Application errors
-    if (error.status) {
+    if (
+      error.status
+    ) {
       return res
-        .status(error.status)
+        .status(
+          error.status
+        )
         .json({
           success: false,
 
@@ -201,14 +218,14 @@ app.use(
         });
     }
 
-    // Generic error
     return res
       .status(500)
       .json({
         success: false,
 
         message:
-          process.env.NODE_ENV ===
+          process.env
+            .NODE_ENV ===
           "production"
             ? "Internal server error"
             : error.message ||

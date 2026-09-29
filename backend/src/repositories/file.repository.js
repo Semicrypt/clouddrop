@@ -9,6 +9,8 @@ export async function createFileRecord({
   sizeBytes,
   category,
   description,
+  storageMode,
+  awsConnectionId,
 }) {
   const result = await pool.query(
     `
@@ -20,9 +22,22 @@ export async function createFileRecord({
         mime_type,
         size_bytes,
         category,
-        description
+        description,
+        storage_mode,
+        aws_connection_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10
+      )
 
       RETURNING
         id,
@@ -34,6 +49,8 @@ export async function createFileRecord({
         size_bytes,
         category,
         description,
+        storage_mode,
+        aws_connection_id,
         uploaded_at,
         updated_at
     `,
@@ -46,6 +63,8 @@ export async function createFileRecord({
       sizeBytes,
       category,
       description || null,
+      storageMode,
+      awsConnectionId || null,
     ]
   );
 
@@ -57,11 +76,16 @@ export async function findFilesByUser({
   search,
   category,
 }) {
-  const conditions = ["user_id = $1"];
-  const values = [userId];
+  const conditions =
+    ["user_id = $1"];
+
+  const values =
+    [userId];
 
   if (search) {
-    values.push(`%${search}%`);
+    values.push(
+      `%${search}%`
+    );
 
     conditions.push(
       `original_name ILIKE $${values.length}`
@@ -69,31 +93,37 @@ export async function findFilesByUser({
   }
 
   if (category) {
-    values.push(category);
+    values.push(
+      category
+    );
 
     conditions.push(
       `category = $${values.length}`
     );
   }
 
-  const result = await pool.query(
-    `
-      SELECT
-        id,
-        user_id,
-        original_name,
-        mime_type,
-        size_bytes,
-        category,
-        description,
-        uploaded_at,
-        updated_at
-      FROM files
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY uploaded_at DESC
-    `,
-    values
-  );
+  const result =
+    await pool.query(
+      `
+        SELECT
+          id,
+          user_id,
+          original_name,
+          mime_type,
+          size_bytes,
+          category,
+          description,
+          storage_mode,
+          uploaded_at,
+          updated_at
+        FROM files
+        WHERE ${conditions.join(
+          " AND "
+        )}
+        ORDER BY uploaded_at DESC
+      `,
+      values
+    );
 
   return result.rows;
 }
@@ -102,72 +132,96 @@ export async function findFileByIdForUser(
   fileId,
   userId
 ) {
-  const result = await pool.query(
-    `
-      SELECT
-        id,
-        user_id,
-        original_name,
-        blob_name,
-        bucket_name,
-        mime_type,
-        size_bytes,
-        category,
-        description,
-        uploaded_at,
-        updated_at
-      FROM files
-      WHERE id = $1
-        AND user_id = $2
-      LIMIT 1
-    `,
-    [fileId, userId]
-  );
+  const result =
+    await pool.query(
+      `
+        SELECT
+          id,
+          user_id,
+          original_name,
+          blob_name,
+          bucket_name,
+          mime_type,
+          size_bytes,
+          category,
+          description,
+          storage_mode,
+          aws_connection_id,
+          uploaded_at,
+          updated_at
+        FROM files
+        WHERE id = $1
+          AND user_id = $2
+        LIMIT 1
+      `,
+      [
+        fileId,
+        userId,
+      ]
+    );
 
-  return result.rows[0] || null;
+  return (
+    result.rows[0] ||
+    null
+  );
 }
 
 export async function findFileMetadataByIdForUser(
   fileId,
   userId
 ) {
-  const result = await pool.query(
-    `
-      SELECT
-        id,
-        user_id,
-        original_name,
-        mime_type,
-        size_bytes,
-        category,
-        description,
-        uploaded_at,
-        updated_at
-      FROM files
-      WHERE id = $1
-        AND user_id = $2
-      LIMIT 1
-    `,
-    [fileId, userId]
-  );
+  const result =
+    await pool.query(
+      `
+        SELECT
+          id,
+          user_id,
+          original_name,
+          mime_type,
+          size_bytes,
+          category,
+          description,
+          storage_mode,
+          uploaded_at,
+          updated_at
+        FROM files
+        WHERE id = $1
+          AND user_id = $2
+        LIMIT 1
+      `,
+      [
+        fileId,
+        userId,
+      ]
+    );
 
-  return result.rows[0] || null;
+  return (
+    result.rows[0] ||
+    null
+  );
 }
 
 export async function deleteFileRecord(
   fileId,
   userId
 ) {
-  const result = await pool.query(
-    `
-      DELETE FROM files
-      WHERE id = $1
-        AND user_id = $2
+  const result =
+    await pool.query(
+      `
+        DELETE FROM files
+        WHERE id = $1
+          AND user_id = $2
 
-      RETURNING id
-    `,
-    [fileId, userId]
+        RETURNING id
+      `,
+      [
+        fileId,
+        userId,
+      ]
+    );
+
+  return (
+    result.rows[0] ||
+    null
   );
-
-  return result.rows[0] || null;
 }

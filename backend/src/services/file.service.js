@@ -4,10 +4,13 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomUUID } from "crypto";
+import {
+  getSignedUrl,
+} from "@aws-sdk/s3-request-presigner";
 
-import s3 from "../config/s3.js";
+import {
+  randomUUID,
+} from "crypto";
 
 import {
   createFileRecord,
@@ -21,71 +24,106 @@ import {
   detectFileCategory,
 } from "../utils/file-category.js";
 
+import {
+  getFileStorage,
+  getUploadStorage,
+} from "./storage.service.js";
+
 export async function uploadFile({
   userId,
   file,
   description,
 }) {
-  const bucketName = process.env.AWS_S3_BUCKET;
-
-  if (!bucketName) {
-    throw new Error(
-      "AWS_S3_BUCKET environment variable is not configured"
+  const storage =
+    await getUploadStorage(
+      userId
     );
-  }
 
   const extension =
-    file.originalname.includes(".")
-      ? file.originalname.split(".").pop()
+    file.originalname.includes(
+      "."
+    )
+      ? file.originalname
+          .split(".")
+          .pop()
       : "";
 
-  const uniqueName = extension
-    ? `${randomUUID()}.${extension}`
-    : randomUUID();
+  const uniqueName =
+    extension
+      ? `${randomUUID()}.${extension}`
+      : randomUUID();
 
   const category =
-    detectFileCategory(file.mimetype);
+    detectFileCategory(
+      file.mimetype
+    );
 
   const objectKey =
     `users/${userId}/${category}/${uniqueName}`;
 
-  await s3.send(
+  await storage.client.send(
     new PutObjectCommand({
-      Bucket: bucketName,
-      Key: objectKey,
-      Body: file.buffer,
-      ContentType: file.mimetype,
+      Bucket:
+        storage.bucketName,
+
+      Key:
+        objectKey,
+
+      Body:
+        file.buffer,
+
+      ContentType:
+        file.mimetype,
 
       Metadata: {
-        originalname: encodeURIComponent(
-          file.originalname
-        ),
-        userid: userId,
+        originalname:
+          encodeURIComponent(
+            file.originalname
+          ),
+
+        userid:
+          userId,
       },
     })
   );
 
   try {
-    const record =
-      await createFileRecord({
-        userId,
-        originalName: file.originalname,
-        blobName: objectKey,
-        bucketName,
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
-        category,
-        description,
-      });
+    return await createFileRecord({
+      userId,
 
-    return record;
+      originalName:
+        file.originalname,
+
+      blobName:
+        objectKey,
+
+      bucketName:
+        storage.bucketName,
+
+      mimeType:
+        file.mimetype,
+
+      sizeBytes:
+        file.size,
+
+      category,
+
+      description,
+
+      storageMode:
+        storage.storageMode,
+
+      awsConnectionId:
+        storage.awsConnectionId,
+    });
   } catch (error) {
-    // Prevent orphaned S3 files
-    // if PostgreSQL insertion fails.
-    await s3.send(
+    await storage.client.send(
       new DeleteObjectCommand({
-        Bucket: bucketName,
-        Key: objectKey,
+        Bucket:
+          storage.bucketName,
+
+        Key:
+          objectKey,
       })
     );
 
@@ -117,7 +155,9 @@ export async function getUserFileMetadata({
 
   if (!file) {
     const error =
-      new Error("File not found");
+      new Error(
+        "File not found"
+      );
 
     error.status = 404;
 
@@ -139,17 +179,27 @@ export async function createFileDownloadUrl({
 
   if (!file) {
     const error =
-      new Error("File not found");
+      new Error(
+        "File not found"
+      );
 
     error.status = 404;
 
     throw error;
   }
 
+  const storage =
+    await getFileStorage(
+      file
+    );
+
   const command =
     new GetObjectCommand({
-      Bucket: file.bucket_name,
-      Key: file.blob_name,
+      Bucket:
+        file.bucket_name,
+
+      Key:
+        file.blob_name,
 
       ResponseContentDisposition:
         `attachment; filename*=UTF-8''${encodeURIComponent(
@@ -159,16 +209,18 @@ export async function createFileDownloadUrl({
 
   const url =
     await getSignedUrl(
-      s3,
+      storage.client,
       command,
       {
-        expiresIn: 300,
+        expiresIn:
+          300,
       }
     );
 
   return {
     file: {
-      id: file.id,
+      id:
+        file.id,
 
       originalName:
         file.original_name,
@@ -181,11 +233,16 @@ export async function createFileDownloadUrl({
 
       category:
         file.category,
+
+      storageMode:
+        file.storage_mode,
     },
 
-    downloadUrl: url,
+    downloadUrl:
+      url,
 
-    expiresIn: 300,
+    expiresIn:
+      300,
   };
 }
 
@@ -201,22 +258,30 @@ export async function deleteUserFile({
 
   if (!file) {
     const error =
-      new Error("File not found");
+      new Error(
+        "File not found"
+      );
 
     error.status = 404;
 
     throw error;
   }
 
-  // Delete the physical object from S3.
-  await s3.send(
+  const storage =
+    await getFileStorage(
+      file
+    );
+
+  await storage.client.send(
     new DeleteObjectCommand({
-      Bucket: file.bucket_name,
-      Key: file.blob_name,
+      Bucket:
+        file.bucket_name,
+
+      Key:
+        file.blob_name,
     })
   );
 
-  // Delete metadata from PostgreSQL.
   const deleted =
     await deleteFileRecord(
       fileId,
@@ -235,8 +300,13 @@ export async function deleteUserFile({
   }
 
   return {
-    id: file.id,
+    id:
+      file.id,
+
     originalName:
       file.original_name,
+
+    storageMode:
+      file.storage_mode,
   };
 }
