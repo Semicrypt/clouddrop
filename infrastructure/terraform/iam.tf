@@ -56,6 +56,20 @@ data "aws_iam_policy_document" "application_permissions" {
   }
 
   statement {
+    sid    = "ReadDatabaseSecret"
+    effect = "Allow"
+
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret"
+    ]
+
+    resources = [
+      aws_db_instance.database.master_user_secret[0].secret_arn
+    ]
+  }
+
+  statement {
     sid    = "AssumeCustomerCloudDropRoles"
     effect = "Allow"
 
