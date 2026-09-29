@@ -51,3 +51,21 @@ variable "db_allocated_storage" {
   type        = number
   default     = 20
 }
+
+variable "ec2_instance_type" {
+  description = "EC2 instance type for the CloudDrop application host."
+  type        = string
+  default     = "t4g.small"
+}
+
+variable "ec2_ami_id" {
+  description = "Pinned Ubuntu 24.04 ARM64 AMI for the CloudDrop application host."
+  type        = string
+  default     = "ami-0fa156f9d99979afc"
+}
+
+variable "ec2_root_volume_size" {
+  description = "Root EBS volume size for the application server in GiB."
+  type        = number
+  default     = 20
+}
