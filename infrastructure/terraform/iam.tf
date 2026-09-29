@@ -27,6 +27,35 @@ resource "aws_iam_role" "application" {
 
 data "aws_iam_policy_document" "application_permissions" {
   statement {
+    sid    = "ManagedStorageBucketAccess"
+    effect = "Allow"
+
+    actions = [
+      "s3:ListBucket",
+      "s3:GetBucketLocation"
+    ]
+
+    resources = [
+      aws_s3_bucket.managed.arn
+    ]
+  }
+
+  statement {
+    sid    = "ManagedStorageObjectAccess"
+    effect = "Allow"
+
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+
+    resources = [
+      "${aws_s3_bucket.managed.arn}/*"
+    ]
+  }
+
+  statement {
     sid    = "AssumeCustomerCloudDropRoles"
     effect = "Allow"
 
@@ -45,6 +74,12 @@ resource "aws_iam_role_policy" "application" {
   role = aws_iam_role.application.id
 
   policy = data.aws_iam_policy_document.application_permissions.json
+}
+
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role = aws_iam_role.application.name
+
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "application" {
