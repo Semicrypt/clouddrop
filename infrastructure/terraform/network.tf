@@ -9,7 +9,8 @@ locals {
 
   database_subnet_cidrs = [
     "10.50.11.0/24",
-    "10.50.12.0/24"
+    "10.50.12.0/24",
+    "10.50.13.0/24"
   ]
 }
 
@@ -73,6 +74,21 @@ resource "aws_subnet" "database_b" {
 
   tags = {
     Name = "${local.name_prefix}-database-b"
+    Tier = "database"
+  }
+}
+
+resource "aws_subnet" "database_c" {
+  vpc_id = aws_vpc.main.id
+
+  cidr_block = local.database_subnet_cidrs[2]
+
+  availability_zone = "eu-north-1c"
+
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "${local.name_prefix}-database-c"
     Tier = "database"
   }
 }

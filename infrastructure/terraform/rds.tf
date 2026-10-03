@@ -3,7 +3,8 @@ resource "aws_db_subnet_group" "database" {
 
   subnet_ids = [
     aws_subnet.database_a.id,
-    aws_subnet.database_b.id
+    aws_subnet.database_b.id,
+    aws_subnet.database_c.id
   ]
 
   tags = {
@@ -14,9 +15,10 @@ resource "aws_db_subnet_group" "database" {
 resource "aws_db_instance" "database" {
   identifier = "${local.name_prefix}-postgres"
 
-  engine         = "postgres"
-  engine_version = var.db_engine_version
-  instance_class = var.db_instance_class
+  engine            = "postgres"
+  engine_version    = var.db_engine_version
+  instance_class    = var.db_instance_class
+  availability_zone = "eu-north-1c"
 
   db_name  = var.db_name
   username = var.db_master_username
