@@ -10,19 +10,59 @@ import fileRoutes from "./routes/file.routes.js";
 import shareRoutes from "./routes/share.routes.js";
 import awsRoutes from "./routes/aws.routes.js";
 
-const app =
-  express();
+const app = express();
 
-app.disable(
-  "x-powered-by"
-);
+const defaultCorsOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
+const configuredCorsOrigins =
+  process.env.CORS_ORIGINS
+    ?.split(",")
+    .map((origin) =>
+      origin.trim()
+    )
+    .filter(Boolean);
+
+const allowedCorsOrigins =
+  new Set(
+    configuredCorsOrigins?.length
+      ? configuredCorsOrigins
+      : defaultCorsOrigins
+  );
+
+app.disable("x-powered-by");
+
+app.use(helmet());
 
 app.use(
-  helmet()
-);
+  cors({
+    origin(origin, callback) {
+      if (
+        !origin ||
+        allowedCorsOrigins.has(
+          origin
+        )
+      ) {
+        return callback(
+          null,
+          true
+        );
+      }
 
-app.use(
-  cors()
+      const error =
+        new Error(
+          "Origin not allowed by CORS"
+        );
+
+      error.status = 403;
+
+      return callback(error);
+    },
+  })
 );
 
 app.use(
@@ -38,29 +78,19 @@ app.use(
   })
 );
 
-app.use(
-  morgan("combined")
-);
+app.use(morgan("combined"));
 
-app.get(
-  "/",
-  (req, res) => {
-    return res
-      .status(200)
-      .json({
-        success: true,
-
-        name:
-          "CloudDrop API",
-
-        description:
-          "Secure Cloud File Storage Platform on AWS",
-
-        version:
-          "1.0.0",
-      });
-  }
-);
+app.get("/", (req, res) => {
+  return res
+    .status(200)
+    .json({
+      success: true,
+      name: "CloudDrop API",
+      description:
+        "Secure Cloud File Storage Platform on AWS",
+      version: "1.0.0",
+    });
+});
 
 app.use(
   "/health",
@@ -87,18 +117,15 @@ app.use(
   awsRoutes
 );
 
-app.use(
-  (req, res) => {
-    return res
-      .status(404)
-      .json({
-        success: false,
-
-        message:
-          "Route not found",
-      });
-  }
-);
+app.use((req, res) => {
+  return res
+    .status(404)
+    .json({
+      success: false,
+      message:
+        "Route not found",
+    });
+});
 
 app.use(
   (
@@ -111,9 +138,7 @@ app.use(
       !error.status ||
       error.status >= 500
     ) {
-      console.error(
-        error
-      );
+      console.error(error);
     }
 
     if (
@@ -124,10 +149,8 @@ app.use(
         .status(400)
         .json({
           success: false,
-
           message:
             "Validation failed",
-
           errors:
             error.issues.map(
               (issue) => ({
@@ -135,7 +158,6 @@ app.use(
                   issue.path.join(
                     "."
                   ),
-
                 message:
                   issue.message,
               })
@@ -155,7 +177,6 @@ app.use(
           .status(413)
           .json({
             success: false,
-
             message:
               `File exceeds the maximum allowed size of ${
                 process.env
@@ -173,7 +194,6 @@ app.use(
           .status(400)
           .json({
             success: false,
-
             message:
               "Only one file can be uploaded at a time",
           });
@@ -187,7 +207,6 @@ app.use(
           .status(400)
           .json({
             success: false,
-
             message:
               "Unexpected file field",
           });
@@ -197,22 +216,18 @@ app.use(
         .status(400)
         .json({
           success: false,
-
           message:
             error.message,
         });
     }
 
-    if (
-      error.status
-    ) {
+    if (error.status) {
       return res
         .status(
           error.status
         )
         .json({
           success: false,
-
           message:
             error.message,
         });
@@ -222,7 +237,6 @@ app.use(
       .status(500)
       .json({
         success: false,
-
         message:
           process.env
             .NODE_ENV ===
