@@ -444,11 +444,64 @@ export default function FileDetailsModal({
   async function handleCopy(
     value
   ) {
+    if (!value) {
+      return;
+    }
+
     try {
-      await navigator.clipboard
-        .writeText(value);
+      if (
+        navigator.clipboard &&
+        window.isSecureContext
+      ) {
+        await navigator.clipboard
+          .writeText(value);
+      } else {
+        const textArea =
+          document.createElement(
+            "textarea"
+          );
+
+        textArea.value = value;
+        textArea.setAttribute(
+          "readonly",
+          ""
+        );
+
+        textArea.style.position =
+          "fixed";
+        textArea.style.opacity =
+          "0";
+        textArea.style.pointerEvents =
+          "none";
+
+        document.body.appendChild(
+          textArea
+        );
+
+        textArea.select();
+        textArea.setSelectionRange(
+          0,
+          textArea.value.length
+        );
+
+        const copied =
+          document.execCommand(
+            "copy"
+          );
+
+        document.body.removeChild(
+          textArea
+        );
+
+        if (!copied) {
+          throw new Error(
+            "Clipboard copy failed"
+          );
+        }
+      }
 
       setCopied(true);
+      setError("");
 
       window.setTimeout(
         () =>
@@ -457,7 +510,7 @@ export default function FileDetailsModal({
       );
     } catch {
       setError(
-        "Unable to copy the link automatically."
+        "Unable to copy the link. Please copy it manually."
       );
     }
   }

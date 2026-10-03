@@ -501,11 +501,66 @@ export default function AwsStorage() {
       }
 
       try {
-        await navigator
-          .clipboard
-          .writeText(
-            value
+        if (
+          navigator.clipboard &&
+          window.isSecureContext
+        ) {
+          await navigator
+            .clipboard
+            .writeText(
+              value
+            );
+        } else {
+          const textArea =
+            document.createElement(
+              "textarea"
+            );
+
+          textArea.value =
+            value;
+
+          textArea.setAttribute(
+            "readonly",
+            ""
           );
+
+          textArea.style.position =
+            "fixed";
+
+          textArea.style.opacity =
+            "0";
+
+          textArea.style.pointerEvents =
+            "none";
+
+          document.body.appendChild(
+            textArea
+          );
+
+          textArea.select();
+
+          textArea.setSelectionRange(
+            0,
+            textArea.value.length
+          );
+
+          const copied =
+            document.execCommand(
+              "copy"
+            );
+
+          document.body.removeChild(
+            textArea
+          );
+
+          if (!copied) {
+            throw new Error(
+              "Clipboard copy failed"
+            );
+          }
+        }
+
+        setPageError("");
 
         setNotice(
           message
@@ -519,7 +574,7 @@ export default function AwsStorage() {
         );
       } catch {
         setPageError(
-          "Unable to copy to clipboard."
+          "Unable to copy to clipboard. Please copy it manually."
         );
       }
     };
